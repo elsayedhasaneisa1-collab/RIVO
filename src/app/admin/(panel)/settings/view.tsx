@@ -13,17 +13,20 @@ type S = {
   governorateFees: Record<string, number>; socialFacebook: string; socialInstagram: string; socialTiktok: string; maxQuantityPerItem: number;
 };
 type Supplier = { id: string; name: string; mode: "api" | "manual"; message: string };
+type SettingsData = { settings: S; suppliers: Supplier[]; adminRegistrationEnabled: boolean; userRole: string };
 
 export function SettingsView() {
-  const { data, error, loading, reload } = useAdminData<{ settings: S; suppliers: Supplier[] }>("/api/admin/settings");
+  const { data, error, loading, reload } = useAdminData<SettingsData>("/api/admin/settings");
   const [s, setS] = useState<S | null>(null);
   const [fees, setFees] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const [adminRegistrationEnabled, setAdminRegistrationEnabled] = useState(false);
   const toast = useToast();
 
   useEffect(() => {
     if (data) {
       setS(data.settings);
+      setAdminRegistrationEnabled(data.adminRegistrationEnabled);
       setFees(Object.fromEntries(Object.entries(data.settings.governorateFees).map(([k, v]) => [k, String(toMajor(v))])));
     }
   }, [data]);
@@ -40,7 +43,9 @@ export function SettingsView() {
     const governorateFees: Record<string, number> = {};
     for (const [k, v] of Object.entries(fees)) if (v !== "" && !Number.isNaN(Number(v))) governorateFees[k] = toMinor(Number(v));
     try {
-      await api("/api/admin/settings", { method: "PUT", json: { ...s, governorateFees } });
+      const payload: Record<string, unknown> = { ...s, governorateFees };
+      if (data?.userRole === "owner") payload.adminRegistrationEnabled = adminRegistrationEnabled;
+      await api("/api/admin/settings", { method: "PUT", json: payload });
       toast.show("تم حفظ الإعدادات");
       reload();
     } catch (err) {
@@ -62,6 +67,27 @@ export function SettingsView() {
       {toast.node}
       <PageHeader title="إعدادات المتجر" actions={<button disabled={saving} className="btn-primary !py-2.5 text-sm">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} حفظ</button>} />
       <div className="grid gap-6 xl:grid-cols-2">
+        {data?.userRole === "owner" && (
+          <Card>
+            <h2 className="mb-3 font-bold">أمان لوحة التحكم</h2>
+            <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl bg-white/5 p-4">
+              <span>
+                <span className="block font-semibold">السماح بإنشاء حسابات المديرين</span>
+                <span className="mt-1 block text-xs leading-6 text-white/55">عند الإغلاق، لن يمكن إنشاء مدير جديد أو ترقية موظف إلى مدير. يظل إنشاء حسابات الموظفين متاحًا.</span>
+              </span>
+              <input
+                type="checkbox"
+                checked={adminRegistrationEnabled}
+                onChange={(e) => setAdminRegistrationEnabled(e.target.checked)}
+                className="h-5 w-5 accent-emerald-500"
+                aria-label="السماح بإنشاء حسابات المديرين"
+              />
+            </label>
+            <p className={`mt-3 text-xs ${adminRegistrationEnabled ? "text-emerald-300" : "text-amber-300"}`}>
+              {adminRegistrationEnabled ? "إنشاء المديرين مفعّل" : "إنشاء المديرين مغلق افتراضيًا"}
+            </p>
+          </Card>
+        )}
         <Card>
           <h2 className="mb-4 font-bold">الهوية والتواصل</h2>
           <div className="grid gap-4 sm:grid-cols-2">

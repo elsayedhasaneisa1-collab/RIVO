@@ -85,3 +85,21 @@ export function publicSettings(s: StoreSettings) {
     maxQuantityPerItem: s.maxQuantityPerItem,
   };
 }
+
+const ADMIN_REGISTRATION_KEY = "admin_registration_enabled";
+
+export async function getAdminRegistrationEnabled(): Promise<boolean> {
+  try {
+    const rows = await db.select().from(settings).where(eq(settings.key, ADMIN_REGISTRATION_KEY)).limit(1);
+    return rows[0]?.value === true;
+  } catch {
+    return false;
+  }
+}
+
+export async function saveAdminRegistrationEnabled(enabled: boolean) {
+  await db
+    .insert(settings)
+    .values({ key: ADMIN_REGISTRATION_KEY, value: enabled, updatedAt: new Date() })
+    .onConflictDoUpdate({ target: settings.key, set: { value: enabled, updatedAt: new Date() } });
+}

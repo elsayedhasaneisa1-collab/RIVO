@@ -2,9 +2,10 @@ import { asc } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { users } from "@/db/schema";
-import { ok, parseBody, route } from "@/lib/server/api";
+import { ApiError, ok, parseBody, route } from "@/lib/server/api";
 import { logAudit } from "@/lib/server/audit";
 import { requireAdmin } from "@/lib/server/auth";
+import { getAdminRegistrationEnabled } from "@/lib/server/settings";
 import { cleanText, hashPassword } from "@/lib/server/security";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,9 @@ const schema = z.object({
 export const POST = route(async (req) => {
   const user = await requireAdmin("users");
   const body = await parseBody(req, schema);
+  if (body.role === "admin" && !(await getAdminRegistrationEnabled())) {
+    throw new ApiError(403, "إنشاء حسابات المديرين مغلق حاليًا بواسطة المالك", "admin_registration_disabled");
+  }
   const [u] = await db
     .insert(users)
     .values({ name: body.name, email: body.email, role: body.role, passwordHash: await hashPassword(body.password) })

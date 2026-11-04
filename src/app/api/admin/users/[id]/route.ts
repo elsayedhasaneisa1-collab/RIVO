@@ -5,6 +5,7 @@ import { sessions, users } from "@/db/schema";
 import { ApiError, ok, parseBody, parseId, route } from "@/lib/server/api";
 import { logAudit } from "@/lib/server/audit";
 import { requireAdmin } from "@/lib/server/auth";
+import { getAdminRegistrationEnabled } from "@/lib/server/settings";
 import { hashPassword } from "@/lib/server/security";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +30,9 @@ export const PATCH = route(async (req, ctx: Ctx) => {
   const id = parseId((await ctx.params).id);
   const body = await parseBody(req, schema);
   const u = await target(id, user.id);
+  if (u.role !== "owner" && u.role !== "admin" && body.role === "admin" && !(await getAdminRegistrationEnabled())) {
+    throw new ApiError(403, "ترقية المستخدم إلى مدير مغلقة حاليًا بواسطة المالك", "admin_registration_disabled");
+  }
   const patch: Partial<typeof users.$inferInsert> = {};
   if (u.role !== "owner") {
     if (body.role) patch.role = body.role;
