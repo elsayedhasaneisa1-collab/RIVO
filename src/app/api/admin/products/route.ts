@@ -1,4 +1,5 @@
 import { and, desc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
+import { revalidateTag } from "next/cache";
 import { db } from "@/db";
 import { categories, products } from "@/db/schema";
 import { ok, parseBody, route } from "@/lib/server/api";
@@ -60,6 +61,7 @@ export const POST = route(async (req) => {
   const input = await parseBody(req, productInputSchema, 200_000);
   const values = computeProductValues(input);
   const [p] = await db.insert(products).values(values).returning({ id: products.id, slug: products.slug });
+  revalidateTag("rivo-products", "max");
   await logAudit({ user, action: "create", entity: "product", entityId: p.id, details: { name: values.name, sku: values.sku, price: values.price, cost: values.costPrice }, req });
   return ok({ product: p }, { status: 201 });
 });

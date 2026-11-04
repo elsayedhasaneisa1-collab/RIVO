@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, gte, ilike, inArray, isNotNull, lte, ne, or, sql, type SQL } from "drizzle-orm";
+import { unstable_cache } from "next/cache";
 import { db } from "@/db";
 import { categories, products, reviews } from "@/db/schema";
 import { PAGE_SIZE } from "@/lib/constants";
@@ -140,26 +141,34 @@ export async function listProducts(f: ProductFilters) {
 }
 
 export async function getFeaturedProducts(limit = 8) {
-  const rows = await baseQuery().where(and(activeFilter, eq(products.isFeatured, true))).orderBy(desc(products.updatedAt)).limit(limit);
-  return rows.map(toPublic);
+  return unstable_cache(async () => {
+    const rows = await baseQuery().where(and(activeFilter, eq(products.isFeatured, true))).orderBy(desc(products.updatedAt)).limit(limit);
+    return rows.map(toPublic);
+  }, ["rivo-featured-products", String(limit)], { revalidate: 60, tags: ["rivo-products"] })();
 }
 
 export async function getLatestProducts(limit = 8) {
-  const rows = await baseQuery().where(activeFilter).orderBy(desc(products.createdAt)).limit(limit);
-  return rows.map(toPublic);
+  return unstable_cache(async () => {
+    const rows = await baseQuery().where(activeFilter).orderBy(desc(products.createdAt)).limit(limit);
+    return rows.map(toPublic);
+  }, ["rivo-latest-products", String(limit)], { revalidate: 60, tags: ["rivo-products"] })();
 }
 
 export async function getOnSaleProducts(limit = 8) {
-  const rows = await baseQuery()
-    .where(and(activeFilter, isNotNull(products.compareAtPrice), sql`${products.compareAtPrice} > ${products.price}`))
-    .orderBy(sql`(${products.compareAtPrice} - ${products.price})::float / nullif(${products.compareAtPrice}, 0) desc`)
-    .limit(limit);
-  return rows.map(toPublic);
+  return unstable_cache(async () => {
+    const rows = await baseQuery()
+      .where(and(activeFilter, isNotNull(products.compareAtPrice), sql`${products.compareAtPrice} > ${products.price}`))
+      .orderBy(sql`(${products.compareAtPrice} - ${products.price})::float / nullif(${products.compareAtPrice}, 0) desc`)
+      .limit(limit);
+    return rows.map(toPublic);
+  }, ["rivo-sale-products", String(limit)], { revalidate: 60, tags: ["rivo-products"] })();
 }
 
 export async function getBestSellers(limit = 8) {
-  const rows = await baseQuery().where(and(activeFilter, sql`${products.soldCount} > 0`)).orderBy(desc(products.soldCount)).limit(limit);
-  return rows.map(toPublic);
+  return unstable_cache(async () => {
+    const rows = await baseQuery().where(and(activeFilter, sql`${products.soldCount} > 0`)).orderBy(desc(products.soldCount)).limit(limit);
+    return rows.map(toPublic);
+  }, ["rivo-best-selling-products", String(limit)], { revalidate: 60, tags: ["rivo-products"] })();
 }
 
 export async function getProductBySlug(slug: string) {
@@ -192,7 +201,7 @@ export async function getProductReviews(productId: number) {
 }
 
 export async function getCategoriesWithCounts() {
-  return db
+  return unstable_cache(async () => db
     .select({
       id: categories.id,
       name: categories.name,
@@ -203,7 +212,7 @@ export async function getCategoriesWithCounts() {
     })
     .from(categories)
     .where(eq(categories.isActive, true))
-    .orderBy(asc(categories.sortOrder), asc(categories.name));
+    .orderBy(asc(categories.sortOrder), asc(categories.name)), ["rivo-categories"], { revalidate: 300, tags: ["rivo-categories"] })();
 }
 
 export async function searchSuggestions(q: string) {
