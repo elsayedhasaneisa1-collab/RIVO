@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { formatMoney } from "@/lib/format";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useCart } from "./cart-context";
 import { CartDrawer } from "./cart-drawer";
 import { Logo } from "./logo";
@@ -162,6 +163,7 @@ export function Header({ announcement }: { announcement?: string }) {
             <SearchBox />
           </div>
           <div className="mr-auto flex items-center gap-1 md:mr-0">
+            <ThemeToggle />
             <button className="grid h-10 w-10 place-items-center rounded-xl hover:bg-white/5 md:hidden" onClick={() => setMobileSearch((v) => !v)} aria-label="بحث">
               <Search className="h-5 w-5" />
             </button>
