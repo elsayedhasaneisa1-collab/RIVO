@@ -62,6 +62,7 @@ export const POST = route(async (req) => {
   const values = computeProductValues(input);
   const [p] = await db.insert(products).values(values).returning({ id: products.id, slug: products.slug });
   revalidateTag("rivo-products", "max");
+  revalidateTag("rivo-categories", "max");
   await logAudit({ user, action: "create", entity: "product", entityId: p.id, details: { name: values.name, sku: values.sku, price: values.price, cost: values.costPrice }, req });
   return ok({ product: p }, { status: 201 });
 });
