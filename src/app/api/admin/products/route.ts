@@ -6,6 +6,7 @@ import { ok, parseBody, route } from "@/lib/server/api";
 import { logAudit } from "@/lib/server/audit";
 import { requireAdmin } from "@/lib/server/auth";
 import { computeProductValues, productInputSchema } from "@/lib/server/product-input";
+import { notifyTelegramNewProduct } from "@/lib/server/integrations/telegram";
 
 export const dynamic = "force-dynamic";
 
@@ -63,5 +64,21 @@ export const POST = route(async (req) => {
   const [p] = await db.insert(products).values(values).returning({ id: products.id, slug: products.slug });
   revalidateTag("rivo-products", "max");
   await logAudit({ user, action: "create", entity: "product", entityId: p.id, details: { name: values.name, sku: values.sku, price: values.price, cost: values.costPrice }, req });
+  if (values.isActive) {
+    try {
+      const sent = await notifyTelegramNewProduct({
+        name: values.name,
+        slug: values.slug,
+        description: values.description,
+        images: values.images,
+        price: values.price,
+        compareAtPrice: values.compareAtPrice,
+        stock: values.stock,
+      });
+      if (!sent) console.error(`telegram_product_post_failed: product ${p.id}`);
+    } catch (error) {
+      console.error("telegram_product_post_error", error instanceof Error ? error.message : "unknown");
+    }
+  }
   return ok({ product: p }, { status: 201 });
 });
