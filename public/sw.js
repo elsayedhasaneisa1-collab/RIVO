@@ -1,4 +1,4 @@
-const CACHE = "rivo-v2";
+const CACHE = "rivo-v3";
 const ASSETS = ["/offline.html", "/icon.svg", "/images/hero.jpg"];
 
 self.addEventListener("install", (event) => {
