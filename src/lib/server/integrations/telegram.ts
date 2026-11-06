@@ -39,28 +39,51 @@ const ownerId = () => process.env.RIVO_TELEGRAM_OWNER_ID?.trim();
 const groupId = () => process.env.RIVO_TELEGRAM_GROUP_ID?.trim();
 
 const BOT_FOOTER = "\n\n━━━━━━━━━━━━━━━━━━\nDeveloped by EL-sayed Hasan";
-const DEV_TAG_REGEX = /<developed by EL-sayed Hasan\/>/gi;
 const DEV_PLAIN_REGEX = /Developed by EL-sayed Hasan/i;
+const DEV_TAG_REGEX = /<developed by EL-sayed Hasan\/>/gi;
 
-function formatBotMessage(text: string) {
-  const cleanText = text.trim();
-  if (/<developed by EL-sayed Hasan\/>/i.test(cleanText)) {
-    return cleanText.replace(DEV_TAG_REGEX, "Developed by EL-sayed Hasan");
-  }
-  if (DEV_PLAIN_REGEX.test(cleanText)) return cleanText;
-  return `✦ RIVO BOT\n━━━━━━━━━━━━━━━━━━\n${cleanText}${BOT_FOOTER}`;
+/* ----------------------------- Format helpers ----------------------------- */
+
+function esc(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
-function money(value: number) {
+function formatBotMessage(text: string): string {
+  const clean = text.trim().replace(DEV_TAG_REGEX, "Developed by EL-sayed Hasan");
+  if (DEV_PLAIN_REGEX.test(clean)) return clean;
+  return `${clean}${BOT_FOOTER}`;
+}
+
+function money(value: number): string {
   return `${(Number(value || 0) / 100).toLocaleString("ar-EG", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })} ج.م`;
 }
 
-function escapeLike(term: string) {
+function escapeLike(term: string): string {
   return term.replace(/[\\%_]/g, "\\$&");
 }
+
+const STATUS_EMOJI: Record<string, string> = {
+  pending: "⏳",
+  payment_review: "🔍",
+  paid: "✅",
+  sent_to_supplier: "📤",
+  shipping: "🚚",
+  delivered: "📬",
+  cancelled: "❌",
+};
+
+function statusLabel(status: string): string {
+  const label = STATUS_LABELS[status as OrderStatus] ?? status;
+  return `${STATUS_EMOJI[status] ?? "•"} ${esc(label)}`;
+}
+
+const DIVIDER = "━━━━━━━━━━━━━━━━━━";
 
 /* ----------------------------- Telegram API ----------------------------- */
 
@@ -77,9 +100,7 @@ export async function telegramRequest(method: string, body: Record<string, unkno
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
       const desc: string = typeof err?.description === "string" ? err.description : "";
-      if (desc.includes("message is not modified")) {
-        return { ok: false, notModified: true };
-      }
+      if (desc.includes("message is not modified")) return { ok: false, notModified: true };
       console.error(`telegram_api_${method}_failed`, response.status, desc.slice(0, 200));
       return null;
     }
@@ -90,35 +111,38 @@ export async function telegramRequest(method: string, body: Record<string, unkno
   }
 }
 
-async function sendMessage(chatId: number, text: string, keyboard?: InlineKeyboardMarkup) {
+async function sendMessage(chatId: number, html: string, keyboard?: InlineKeyboardMarkup) {
   await telegramRequest("sendMessage", {
     chat_id: chatId,
-    text: formatBotMessage(text),
+    text: formatBotMessage(html),
+    parse_mode: "HTML",
     reply_markup: keyboard,
     disable_web_page_preview: true,
   });
 }
 
-async function reply(chatId: number, text: string) {
-  await sendMessage(chatId, text);
+async function reply(chatId: number, html: string) {
+  await sendMessage(chatId, html);
 }
 
 async function editMessage(
   chatId: number,
   messageId: number,
-  text: string,
+  html: string,
   keyboard?: InlineKeyboardMarkup,
 ) {
   const result = await telegramRequest("editMessageText", {
     chat_id: chatId,
     message_id: messageId,
-    text: formatBotMessage(text),
+    text: formatBotMessage(html),
+    parse_mode: "HTML",
     reply_markup: keyboard,
     disable_web_page_preview: true,
   });
   if (result && result.notModified) return;
   if (!result) {
-    await sendMessage(chatId, text, keyboard);
+    // fallback: الرسالة ممكن تكون صورة أو مش قابلة للتعديل — نرسل جديدة
+    await sendMessage(chatId, html, keyboard);
   }
 }
 
@@ -131,18 +155,25 @@ async function answerCallback(callbackId: string, text?: string, showAlert = fal
 }
 
 async function sendWelcomePhoto(chatId: number, role: BotRole | null) {
+  // صورة بدون أزرار
   await telegramRequest("sendPhoto", {
     chat_id: chatId,
     photo: "https://rivo-eight-wine.vercel.app/rivo-bot-welcome.png",
     caption:
-      "🤖 RIVO BOT\nمساعد متجرك الذكي لإدارة الطلبات والمنتجات.\n\n👇 اختر من الأزرار بالأسفل، أو استخدم /help.",
-    reply_markup: mainMenu(role),
+      "🤖 <b>RIVO BOT</b>\nمساعدك الذكي لإدارة المتجر بسهولة وأمان.",
+    parse_mode: "HTML",
   });
+  // رسالة نصية منفصلة فيها الأزرار (حتى تعمل editMessageText بدون مشاكل)
+  await sendMessage(
+    chatId,
+    `🎉 <b>أهلاً بك في RIVO BOT</b>\n${DIVIDER}\n\nاختر من القائمة بالأسفل 👇`,
+    mainMenu(role),
+  );
 }
 
 export async function sendTelegramText(text: string, chatId = groupId()) {
   if (!chatId || !token()) return;
-  await sendMessage(Number(chatId), text);
+  await sendMessage(Number(chatId), esc(text));
 }
 
 export async function notifyTelegramNewOrder(order: {
@@ -151,15 +182,24 @@ export async function notifyTelegramNewOrder(order: {
   phone: string;
   total: number;
 }) {
-  await sendTelegramText(
-    `🛒 طلب جديد في RIVO\nرقم الطلب: ${order.reference}\nالإجمالي: ${(order.total / 100).toLocaleString("ar-EG")} ج.م\n\nلعرض التفاصيل، استخدم /order ${order.reference} في المحادثة الخاصة مع البوت.`,
-  );
+  const body =
+    `🛒 <b>طلب جديد في RIVO</b>\n` +
+    `${DIVIDER}\n\n` +
+    `🔖 الرقم: <code>${esc(order.reference)}</code>\n` +
+    `👤 العميل: ${esc(order.name)}\n` +
+    `💰 الإجمالي: <b>${money(order.total)}</b>\n\n` +
+    `لعرض التفاصيل: /order ${esc(order.reference)}`;
+  await sendTelegramText(body);
 }
 
 export async function notifyTelegramOrderStatus(reference: string, from: string, to: string) {
-  await sendTelegramText(
-    `🔔 تحديث طلب في RIVO\nالطلب: ${reference}\nالحالة السابقة: ${STATUS_LABELS[from as OrderStatus] ?? from}\nالحالة الجديدة: ${STATUS_LABELS[to as OrderStatus] ?? to}`,
-  );
+  const body =
+    `🔔 <b>تحديث حالة طلب</b>\n` +
+    `${DIVIDER}\n\n` +
+    `📦 الطلب: <code>${esc(reference)}</code>\n` +
+    `📊 من: ${statusLabel(from)}\n` +
+    `📊 إلى: ${statusLabel(to)}`;
+  await sendTelegramText(body);
 }
 
 /* ----------------------------- Keyboards ----------------------------- */
@@ -200,7 +240,7 @@ function orderActions(order: { reference: string; status: OrderStatus }): Inline
   } else if (s === "sent_to_supplier" || s === "shipping") {
     row.push({ text: "🚚 تم التسليم", callback_data: `act:delivered:${order.reference}` });
   }
-  row.push({ text: "🔙 الطلبات", callback_data: "list:pending" });
+  row.push({ text: "🔙 القائمة", callback_data: "menu" });
   return { inline_keyboard: [row] };
 }
 
@@ -243,47 +283,47 @@ async function findOrder(value: string) {
   return rows[0] ?? null;
 }
 
-function buildHelp(role: BotRole | null) {
+function buildHelp(role: BotRole | null): string {
   const lines: string[] = [
-    "📋 أوامر RIVO BOT",
+    "📋 <b>أوامر RIVO BOT</b>",
+    DIVIDER,
     "",
-    "🔹 عام:",
+    "🔹 <b>عام:</b>",
     "/id — معرفة المعرفات",
     "/help — المساعدة",
   ];
   if (role) {
     lines.push(
       "",
-      "🔷 للمديرين المعتمدين:",
-      "/orders — آخر الطلبات (خاص)",
-      "/neworders — الطلبات الجديدة (خاص)",
-      "/pending — الطلبات المعلقة (خاص)",
-      "/order رقم — تفاصيل طلب (خاص)",
+      "🔷 <b>للمديرين:</b>",
+      "/orders — آخر الطلبات",
+      "/neworders — الطلبات الجديدة",
+      "/pending — الطلبات المعلقة",
+      "/order رقم — تفاصيل طلب",
       "/confirm رقم — تأكيد الدفع",
       "/cancel رقم — إلغاء طلب",
       "/ship رقم — تحديث الشحن",
       "/delivered رقم — تأكيد التسليم",
       "/products — المنتجات",
       "/product SKU — تفاصيل منتج",
-      "/search كلمة — البحث عن منتج",
+      "/search كلمة — البحث",
       "/lowstock — مخزون منخفض",
       "/outstock — منتجات نافدة",
       "/setstock SKU كمية — تعديل المخزون",
-      "/activity — آخر سجل تغييرات (خاص)",
+      "/activity — آخر العمليات",
     );
   }
   if (role === "owner") {
     lines.push(
       "",
-      "👑 للمالك فقط:",
-      "/stats — إحصائيات المتجر (خاص)",
-      "/profits — الأرباح (خاص)",
-      "/managers — المديرون (خاص)",
+      "👑 <b>للمالك فقط:</b>",
+      "/stats — إحصائيات المتجر",
+      "/profits — الأرباح",
+      "/managers — المدراء",
       "/addadmin ID admin|staff — إضافة مدير",
       "/removeadmin ID — حذف مدير",
     );
   }
-  lines.push("", "<developed by EL-sayed Hasan/>");
   return lines.join("\n");
 }
 
@@ -316,13 +356,7 @@ const FORBIDDEN_STATUS: Record<string, string[]> = {
   delivered: ["pending", "payment_review", "cancelled", "delivered"],
 };
 
-const MUTATING_COMMANDS = new Set([
-  "/confirm",
-  "/cancel",
-  "/ship",
-  "/delivered",
-  "/setstock",
-]);
+const MUTATING_COMMANDS = new Set(["/confirm", "/cancel", "/ship", "/delivered", "/setstock"]);
 
 /* ----------------------------- Command router ----------------------------- */
 
@@ -340,14 +374,20 @@ async function runCommand(message: TelegramMessage) {
   }
 
   if (command === "/id") {
-    await reply(chatId, `Telegram ID: ${senderId}\nChat ID: ${chatId}`);
+    await reply(
+      chatId,
+      `🆔 <b>المعرفات</b>\n${DIVIDER}\n\n👤 Telegram ID: <code>${esc(senderId)}</code>\n💬 Chat ID: <code>${esc(chatId)}</code>`,
+    );
     return;
   }
 
   if (command === "/start" || command === "/help") {
     const role = await getRole(senderId);
-    await sendWelcomePhoto(chatId, role);
-    await reply(chatId, buildHelp(role));
+    if (command === "/start") {
+      await sendWelcomePhoto(chatId, role);
+      return;
+    }
+    await sendMessage(chatId, buildHelp(role), backButton("menu"));
     return;
   }
 
@@ -355,7 +395,7 @@ async function runCommand(message: TelegramMessage) {
   if (!role) {
     await reply(
       chatId,
-      "⛔ هذا الأمر متاح للمالك والمديرين المعتمدين فقط. أرسل /id للمالك لمعرفة Telegram ID الخاص بك.",
+      "⛔ <b>غير مصرح</b>\n\nهذا الأمر متاح للمالك والمديرين المعتمدين فقط.\nأرسل /id للمالك لمعرفة Telegram ID الخاص بك.",
     );
     return;
   }
@@ -366,7 +406,7 @@ async function runCommand(message: TelegramMessage) {
       return;
     }
     if (MUTATING_COMMANDS.has(command)) {
-      await reply(chatId, "🔒 أوامر تعديل الطلبات والمخزون متاحة فقط في المحادثة الخاصة مع البوت.");
+      await reply(chatId, "🔒 <b>أوامر التعديل متاحة فقط في المحادثة الخاصة.</b>");
       return;
     }
   }
@@ -382,10 +422,7 @@ async function runCommand(message: TelegramMessage) {
     "/activity",
   ];
   if (privateOnly.includes(command) && message.chat.type !== "private") {
-    await reply(
-      chatId,
-      "🔒 حفاظًا على خصوصية العملاء وبيانات المتجر، استخدم هذا الأمر في المحادثة الخاصة مع البوت.",
-    );
+    await reply(chatId, "🔒 <b>خصوصية البيانات:</b> استخدم هذا الأمر في المحادثة الخاصة مع البوت.");
     return;
   }
 
@@ -412,10 +449,15 @@ async function runCommand(message: TelegramMessage) {
         .from(orders)
         .where(sql`${orders.createdAt} >= date_trunc('day', now())`),
     ]);
-    await reply(
-      chatId,
-      `📊 إحصائيات RIVO\nإجمالي الطلبات: ${counts.orders}\nالعملاء: ${counts.customers}\nالمنتجات: ${counts.products}\nطلبات اليوم: ${today.count}\nمبيعات الطلبات اليوم: ${money(Number(today.sales))}`,
-    );
+    const body =
+      `📊 <b>إحصائيات المتجر</b>\n` +
+      `${DIVIDER}\n\n` +
+      `🛒 إجمالي الطلبات: <b>${counts.orders}</b>\n` +
+      `👥 العملاء: <b>${counts.customers}</b>\n` +
+      `📦 المنتجات: <b>${counts.products}</b>\n\n` +
+      `📅 طلبات اليوم: <b>${today.count}</b>\n` +
+      `💰 مبيعات اليوم: <b>${money(Number(today.sales))}</b>`;
+    await sendMessage(chatId, body, backButton("menu"));
     return;
   }
 
@@ -426,10 +468,12 @@ async function runCommand(message: TelegramMessage) {
         expected: sql<number>`coalesce(sum(${orders.profit}) filter (where ${orders.status} in ('paid','sent_to_supplier','shipping')),0)::bigint`,
       })
       .from(orders);
-    await reply(
-      chatId,
-      `💰 الأرباح\nالأرباح المحققة: ${money(Number(row.realized))}\nالأرباح المتوقعة: ${money(Number(row.expected))}`,
-    );
+    const body =
+      `💰 <b>الأرباح</b>\n` +
+      `${DIVIDER}\n\n` +
+      `✅ محققة: <b>${money(Number(row.realized))}</b>\n` +
+      `⏳ متوقعة: <b>${money(Number(row.expected))}</b>`;
+    await sendMessage(chatId, body, backButton("menu"));
     return;
   }
 
@@ -439,12 +483,11 @@ async function runCommand(message: TelegramMessage) {
       .from(telegramManagers)
       .where(eq(telegramManagers.isActive, true))
       .orderBy(telegramManagers.createdAt);
-    await reply(
-      chatId,
-      managers.length
-        ? `👥 مديرو البوت\n${managers.map((m) => `${m.telegramId} — ${m.name} (${m.role})`).join("\n")}`
-        : "لا يوجد مديرون مضافون.",
-    );
+    const body = managers.length
+      ? `👥 <b>مديرو البوت</b>\n${DIVIDER}\n\n` +
+        managers.map((m) => `• <code>${esc(m.telegramId)}</code> — ${esc(m.name)} (${esc(m.role)})`).join("\n")
+      : "👥 لا يوجد مديرون مضافون.";
+    await sendMessage(chatId, body, backButton("menu"));
     return;
   }
 
@@ -452,11 +495,11 @@ async function runCommand(message: TelegramMessage) {
     const id = args[0];
     const managerRole = args[1] === "admin" ? "admin" : args[1] === "staff" ? "staff" : null;
     if (!id || !/^\d{5,20}$/.test(id) || !managerRole) {
-      await reply(chatId, "الاستخدام: /addadmin TELEGRAM_ID admin أو /addadmin TELEGRAM_ID staff");
+      await reply(chatId, "الاستخدام: <code>/addadmin TELEGRAM_ID admin|staff</code>");
       return;
     }
     if (id === ownerId()) {
-      await reply(chatId, "هذا هو معرف المالك ولا يمكن إضافته كمدير.");
+      await reply(chatId, "⚠️ هذا هو معرف المالك ولا يمكن إضافته كمدير.");
       return;
     }
     await db
@@ -473,14 +516,14 @@ async function runCommand(message: TelegramMessage) {
       entityId: id,
       details: { role: managerRole },
     });
-    await reply(chatId, `✅ تمت إضافة ${id} بصلاحية ${managerRole}.`);
+    await reply(chatId, `✅ تمت إضافة <code>${esc(id)}</code> بصلاحية <b>${esc(managerRole)}</b>.`);
     return;
   }
 
   if (command === "/removeadmin") {
     const id = args[0];
     if (!id || !/^\d{5,20}$/.test(id)) {
-      await reply(chatId, "الاستخدام: /removeadmin TELEGRAM_ID");
+      await reply(chatId, "الاستخدام: <code>/removeadmin TELEGRAM_ID</code>");
       return;
     }
     const removed = await db
@@ -496,7 +539,7 @@ async function runCommand(message: TelegramMessage) {
       });
     await reply(
       chatId,
-      removed.length ? `✅ تم حذف المدير ${id}.` : "لم يتم العثور على هذا المدير.",
+      removed.length ? `✅ تم حذف المدير <code>${esc(id)}</code>.` : "⚠️ لم يتم العثور على هذا المدير.",
     );
     return;
   }
@@ -508,7 +551,6 @@ async function runCommand(message: TelegramMessage) {
         name: orders.name,
         total: orders.total,
         status: orders.status,
-        createdAt: orders.createdAt,
       })
       .from(orders);
     const rows =
@@ -522,24 +564,40 @@ async function runCommand(message: TelegramMessage) {
           : await query.orderBy(desc(orders.createdAt)).limit(10);
 
     if (!rows.length) {
-      await reply(chatId, "لا توجد طلبات.");
+      await reply(chatId, "📭 لا توجد طلبات حالياً.");
       return;
     }
-    const lines = rows
-      .map((o) => `${o.reference} | ${money(o.total)} | ${STATUS_LABELS[o.status as OrderStatus] ?? o.status}`)
-      .join("\n");
-    await sendMessage(chatId, `🛒 الطلبات\n${lines}\n\n👇 اضغط على طلب لعرض تفاصيله`, ordersListButtons(rows));
+    const total = rows.reduce((s, o) => s + o.total, 0);
+    const body =
+      `🛒 <b>الطلبات</b>\n` +
+      `${DIVIDER}\n\n` +
+      `📊 العدد: <b>${rows.length}</b>\n` +
+      `💰 الإجمالي: <b>${money(total)}</b>\n\n` +
+      `👇 اضغط على طلب لعرض التفاصيل`;
+    await sendMessage(chatId, body, ordersListButtons(rows));
     return;
   }
 
   if (command === "/order") {
     const order = args[0] ? await findOrder(args[0]) : null;
     if (!order) {
-      await reply(chatId, "لم يتم العثور على الطلب. مثال: /order RV-260101-ABC234");
+      await reply(chatId, "❌ لم يتم العثور على الطلب.\nمثال: <code>/order RV-260101-ABC234</code>");
       return;
     }
-    const body = `📦 تفاصيل الطلب ${order.reference}\nالعميل: ${order.name}\nالهاتف: ${order.phone}\nالعنوان: ${order.governorate} - ${order.city} - ${order.area}\nالإجمالي: ${money(order.total)}\nالحالة: ${STATUS_LABELS[order.status as OrderStatus] ?? order.status}\nتاريخ الطلب: ${order.createdAt.toLocaleString("ar-EG")}`;
-    await sendMessage(chatId, body, orderActions({ reference: order.reference, status: order.status as OrderStatus }));
+    const body =
+      `📦 <b>تفاصيل الطلب</b>\n` +
+      `${DIVIDER}\n\n` +
+      `🔖 الرقم: <code>${esc(order.reference)}</code>\n` +
+      `👤 العميل: ${esc(order.name)}\n` +
+      `📞 الهاتف: <code>${esc(order.phone)}</code>\n` +
+      `📍 العنوان: ${esc(order.governorate)} - ${esc(order.city)}\n\n` +
+      `💰 الإجمالي: <b>${money(order.total)}</b>\n` +
+      `📊 الحالة: ${statusLabel(order.status)}`;
+    await sendMessage(
+      chatId,
+      body,
+      orderActions({ reference: order.reference, status: order.status as OrderStatus }),
+    );
     return;
   }
 
@@ -553,7 +611,7 @@ async function runCommand(message: TelegramMessage) {
     if (FORBIDDEN_STATUS[actionKey]?.includes(order.status)) {
       await reply(
         chatId,
-        `⚠️ لا يمكن تنفيذ ${command} على طلب حالته الحالية: ${STATUS_LABELS[order.status as OrderStatus] ?? order.status}.`,
+        `⚠️ لا يمكن تنفيذ هذا الإجراء.\nالحالة الحالية: ${statusLabel(order.status)}`,
       );
       return;
     }
@@ -589,10 +647,16 @@ async function runCommand(message: TelegramMessage) {
       if (order.whatsappUpdatesConsent) {
         notifyWhatsappOrderStatus(order.phone, order.name, result.reference, result.to).catch(() => {});
       }
-      await reply(chatId, `✅ تم تحديث الطلب ${result.reference}: ${result.from} ← ${result.to}`);
+      const body =
+        `✅ <b>تم التحديث</b>\n` +
+        `${DIVIDER}\n\n` +
+        `📦 الطلب: <code>${esc(result.reference)}</code>\n` +
+        `📊 من: ${statusLabel(result.from)}\n` +
+        `📊 إلى: ${statusLabel(result.to)}`;
+      await sendMessage(chatId, body, orderActions({ reference: order.reference, status: result.to as OrderStatus }));
     } catch (error) {
       const msg = error instanceof Error ? error.message : "خطأ غير متوقع";
-      await reply(chatId, `⚠️ تعذّر تحديث الطلب ${order.reference}: ${msg}`);
+      await reply(chatId, `⚠️ تعذّر التحديث: ${esc(msg)}`);
     }
     return;
   }
@@ -610,12 +674,17 @@ async function runCommand(message: TelegramMessage) {
         : command === "/outstock"
           ? await query.where(eq(products.stock, 0)).orderBy(products.name).limit(15)
           : await query.orderBy(products.name).limit(15);
-    await reply(
-      chatId,
-      rows.length
-        ? `📦 المنتجات\n${rows.map((p) => `${p.name} | ${p.sku} | المخزون: ${p.stock}`).join("\n")}`
-        : "لا توجد منتجات مطابقة.",
-    );
+
+    if (!rows.length) {
+      await reply(chatId, "📭 لا توجد منتجات مطابقة.");
+      return;
+    }
+    const title =
+      command === "/lowstock" ? "⚠️ مخزون منخفض" : command === "/outstock" ? "❌ منتجات نافدة" : "📦 المنتجات";
+    const body =
+      `${title}\n${DIVIDER}\n\n` +
+      rows.map((p) => `• ${esc(p.name)}\n  <code>${esc(p.sku)}</code>  •  المخزون: <b>${p.stock}</b>`).join("\n\n");
+    await reply(chatId, body);
     return;
   }
 
@@ -637,17 +706,20 @@ async function runCommand(message: TelegramMessage) {
       .from(products)
       .where(sql`${products.sku} ilike ${safe} OR ${products.name} ilike ${`%${safe}%`}`)
       .limit(10);
-    await reply(
-      chatId,
-      rows.length
-        ? rows
-            .map(
-              (p) =>
-                `${p.name} | ${p.sku} | ${money(p.price)} | المخزون ${p.stock} | ${p.isActive ? "نشط" : "متوقف"}`,
-            )
-            .join("\n")
-        : "لم يتم العثور على منتجات.",
-    );
+
+    if (!rows.length) {
+      await reply(chatId, "❌ لم يتم العثور على منتجات.");
+      return;
+    }
+    const body =
+      `🔍 <b>نتائج البحث</b>\n${DIVIDER}\n\n` +
+      rows
+        .map(
+          (p) =>
+            `• ${esc(p.name)}\n  <code>${esc(p.sku)}</code>  •  ${money(p.price)}  •  المخزون: <b>${p.stock}</b>  •  ${p.isActive ? "✅ نشط" : "⛔ متوقف"}`,
+        )
+        .join("\n\n");
+    await reply(chatId, body);
     return;
   }
 
@@ -655,7 +727,7 @@ async function runCommand(message: TelegramMessage) {
     const sku = args[0];
     const quantity = Number(args[1]);
     if (!sku || !Number.isInteger(quantity) || quantity < 0 || quantity > 1000000) {
-      await reply(chatId, "الاستخدام: /setstock SKU كمية (صفر أو أكثر)");
+      await reply(chatId, "الاستخدام: <code>/setstock SKU كمية</code> (صفر أو أكثر)");
       return;
     }
     const updated = await db
@@ -674,8 +746,8 @@ async function runCommand(message: TelegramMessage) {
     await reply(
       chatId,
       updated.length
-        ? `✅ تم تحديث مخزون ${updated[0].name} إلى ${updated[0].stock}.`
-        : "لم يتم العثور على SKU.",
+        ? `✅ تم تحديث مخزون <b>${esc(updated[0].name)}</b> إلى <b>${updated[0].stock}</b>.`
+        : "⚠️ لم يتم العثور على SKU.",
     );
     return;
   }
@@ -692,16 +764,20 @@ async function runCommand(message: TelegramMessage) {
       .where(like(auditLogs.userEmail, "telegram:%"))
       .orderBy(desc(auditLogs.createdAt))
       .limit(8);
-    await reply(
-      chatId,
-      rows.length
-        ? `🧾 آخر العمليات\n${rows.map((r) => `${r.action} | ${r.entity} ${r.entityId ?? ""} | ${r.createdAt.toLocaleString("ar-EG")}`).join("\n")}`
-        : "لا يوجد سجل عمليات.",
-    );
+    const body = rows.length
+      ? `🧾 <b>آخر العمليات</b>\n${DIVIDER}\n\n` +
+        rows
+          .map(
+            (r) =>
+              `• <b>${esc(r.action)}</b>\n  ${esc(r.entity)} ${esc(r.entityId ?? "")}\n  <i>${r.createdAt.toLocaleString("ar-EG")}</i>`,
+          )
+          .join("\n\n")
+      : "📭 لا يوجد سجل عمليات.";
+    await reply(chatId, body);
     return;
   }
 
-  await reply(chatId, "أمر غير معروف. استخدم /help لعرض الأوامر.");
+  await reply(chatId, "❓ أمر غير معروف. استخدم /help لعرض الأوامر.");
 }
 
 /* ----------------------------- Callback router ----------------------------- */
@@ -719,7 +795,7 @@ async function handleCallbackQuery(cb: TelegramCallbackQuery) {
   const senderId = String(cb.from.id);
 
   if (isRateLimited(senderId)) {
-    await answerCallback(cb.id, "⏳ عدد كبير من الضغطات. انتظر قليلاً.", true);
+    await answerCallback(cb.id, "⏳ برجاء التمهّل قليلاً", true);
     return;
   }
 
@@ -729,34 +805,54 @@ async function handleCallbackQuery(cb: TelegramCallbackQuery) {
     return;
   }
 
-  const [type, action, ...rest] = cb.data.split(":");
-  const reference = rest[0] ?? "";
+  const [type, action = "", ...rest] = cb.data.split(":");
+  // view:REF → reference = action | act:ACTION:REF → reference = rest[0]
+  const reference = type === "view" ? action : (rest[0] ?? "");
 
+  // أزرار المالك فقط
   const ownerActions = new Set(["stats", "profits", "managers"]);
-  if (ownerActions.has(type) && role !== "owner") {
-    await answerCallback(cb.id, "⛔ للمالك فقط", true);
-    return;
+  if (ownerActions.has(type)) {
+    if (role !== "owner") {
+      await answerCallback(cb.id, "⛔ للمالك فقط", true);
+      return;
+    }
+    if (chatType !== "private") {
+      await answerCallback(cb.id, "🔒 استخدم هذا في المحادثة الخاصة", true);
+      return;
+    }
   }
-  if (ownerActions.has(type) && chatType !== "private") {
-    await answerCallback(cb.id, "🔒 استخدم هذا في المحادثة الخاصة", true);
-    return;
-  }
+
+  // ack مرة واحدة فقط لكل callback
+  let answered = false;
+  const ack = async (text?: string, showAlert = false) => {
+    if (answered) return;
+    answered = true;
+    await answerCallback(cb.id, text, showAlert);
+  };
 
   try {
+    /* ---- menu ---- */
     if (type === "menu") {
-      await answerCallback(cb.id);
-      await editMessage(chatId, messageId, "اختر من القائمة:", mainMenu(role));
+      await ack();
+      await editMessage(
+        chatId,
+        messageId,
+        `🎉 <b>القائمة الرئيسية</b>\n${DIVIDER}\n\nاختر من الأزرار بالأسفل 👇`,
+        mainMenu(role),
+      );
       return;
     }
 
+    /* ---- help ---- */
     if (type === "help") {
-      await answerCallback(cb.id);
+      await ack();
       await editMessage(chatId, messageId, buildHelp(role), backButton("menu"));
       return;
     }
 
+    /* ---- list:new / list:pending ---- */
     if (type === "list") {
-      await answerCallback(cb.id);
+      await ack();
       const statuses: string[] = action === "new" ? ["pending"] : ["pending", "payment_review"];
       const rows = await db
         .select({ reference: orders.reference, total: orders.total, status: orders.status })
@@ -766,27 +862,37 @@ async function handleCallbackQuery(cb: TelegramCallbackQuery) {
         .limit(10);
 
       if (!rows.length) {
-        await editMessage(chatId, messageId, "لا توجد طلبات حالياً.", backButton("menu"));
+        await editMessage(chatId, messageId, "📭 لا توجد طلبات حالياً.", backButton("menu"));
         return;
       }
-      const lines = rows
-        .map(
-          (o) =>
-            `${o.reference} | ${money(o.total)} | ${STATUS_LABELS[o.status as OrderStatus] ?? o.status}`,
-        )
-        .join("\n");
-      await editMessage(chatId, messageId, `🛒 الطلبات\n${lines}\n\n👇 اضغط لعرض التفاصيل`, ordersListButtons(rows));
+      const total = rows.reduce((s, o) => s + o.total, 0);
+      const title = action === "new" ? "🛒 <b>الطلبات الجديدة</b>" : "⏳ <b>الطلبات المعلقة</b>";
+      const body =
+        `${title}\n${DIVIDER}\n\n` +
+        `📊 العدد: <b>${rows.length}</b>\n` +
+        `💰 الإجمالي: <b>${money(total)}</b>\n\n` +
+        `👇 اضغط على طلب لعرض التفاصيل`;
+      await editMessage(chatId, messageId, body, ordersListButtons(rows));
       return;
     }
 
+    /* ---- view:REF ---- */
     if (type === "view") {
       const order = await findOrder(reference);
       if (!order) {
-        await answerCallback(cb.id, "❌ لم يتم العثور على الطلب", true);
+        await ack("❌ لم يتم العثور على الطلب", true);
         return;
       }
-      await answerCallback(cb.id);
-      const body = `📦 ${order.reference}\nالعميل: ${order.name}\nالهاتف: ${order.phone}\nالعنوان: ${order.governorate} - ${order.city} - ${order.area}\nالإجمالي: ${money(order.total)}\nالحالة: ${STATUS_LABELS[order.status as OrderStatus] ?? order.status}`;
+      await ack();
+      const body =
+        `📦 <b>تفاصيل الطلب</b>\n` +
+        `${DIVIDER}\n\n` +
+        `🔖 الرقم: <code>${esc(order.reference)}</code>\n` +
+        `👤 العميل: ${esc(order.name)}\n` +
+        `📞 الهاتف: <code>${esc(order.phone)}</code>\n` +
+        `📍 العنوان: ${esc(order.governorate)} - ${esc(order.city)}\n\n` +
+        `💰 الإجمالي: <b>${money(order.total)}</b>\n` +
+        `📊 الحالة: ${statusLabel(order.status)}`;
       await editMessage(
         chatId,
         messageId,
@@ -796,27 +902,25 @@ async function handleCallbackQuery(cb: TelegramCallbackQuery) {
       return;
     }
 
+    /* ---- act:ACTION:REF ---- */
     if (type === "act") {
       const order = await findOrder(reference);
       if (!order) {
-        await answerCallback(cb.id, "❌ لم يتم العثور على الطلب", true);
+        await ack("❌ لم يتم العثور على الطلب", true);
         return;
       }
 
+      // خطوة تأكيد الإلغاء
       if (action === "cancel") {
         if (FORBIDDEN_STATUS.cancel.includes(order.status)) {
-          await answerCallback(
-            cb.id,
-            `⚠️ لا يمكن الإلغاء (${STATUS_LABELS[order.status as OrderStatus] ?? order.status})`,
-            true,
-          );
+          await ack(`⚠️ لا يمكن الإلغاء (${statusLabel(order.status)})`, true);
           return;
         }
-        await answerCallback(cb.id);
+        await ack();
         await editMessage(
           chatId,
           messageId,
-          `⚠️ تأكيد إلغاء الطلب ${order.reference}؟\n\nهذا الإجراء نهائي ولا يمكن التراجع عنه.`,
+          `⚠️ <b>تأكيد الإلغاء</b>\n${DIVIDER}\n\n📦 الطلب: <code>${esc(order.reference)}</code>\n\nهذا الإجراء نهائي ولا يمكن التراجع عنه.`,
           {
             inline_keyboard: [
               [
@@ -830,11 +934,7 @@ async function handleCallbackQuery(cb: TelegramCallbackQuery) {
       }
 
       if (FORBIDDEN_STATUS[action]?.includes(order.status)) {
-        await answerCallback(
-          cb.id,
-          `⚠️ لا يمكن تنفيذها (${STATUS_LABELS[order.status as OrderStatus] ?? order.status})`,
-          true,
-        );
+        await ack(`⚠️ لا يمكن التنفيذ (${statusLabel(order.status)})`, true);
         return;
       }
 
@@ -851,6 +951,8 @@ async function handleCallbackQuery(cb: TelegramCallbackQuery) {
         role,
       } as AdminUser;
 
+      await ack();
+
       try {
         const result = await transitionOrder(order.id, target, actor, `callback:${action}`);
 
@@ -862,11 +964,16 @@ async function handleCallbackQuery(cb: TelegramCallbackQuery) {
           details: { reference: result.reference, from: result.from, to: result.to },
         });
 
-        await answerCallback(cb.id, "✅ تم التنفيذ");
+        const body =
+          `✅ <b>تم التحديث</b>\n` +
+          `${DIVIDER}\n\n` +
+          `📦 الطلب: <code>${esc(order.reference)}</code>\n` +
+          `📊 من: ${statusLabel(result.from)}\n` +
+          `📊 إلى: ${statusLabel(result.to)}`;
         await editMessage(
           chatId,
           messageId,
-          `✅ ${order.reference}\n${STATUS_LABELS[result.from as OrderStatus] ?? result.from} ← ${STATUS_LABELS[result.to as OrderStatus] ?? result.to}`,
+          body,
           orderActions({ reference: order.reference, status: result.to as OrderStatus }),
         );
 
@@ -876,13 +983,14 @@ async function handleCallbackQuery(cb: TelegramCallbackQuery) {
         }
       } catch (error) {
         const msg = error instanceof Error ? error.message : "خطأ غير متوقع";
-        await answerCallback(cb.id, `⚠️ ${msg}`, true);
+        await editMessage(chatId, messageId, `⚠️ <b>فشل التحديث</b>\n\n${esc(msg)}`, backButton("menu"));
       }
       return;
     }
 
+    /* ---- products:list / products:low ---- */
     if (type === "products") {
-      await answerCallback(cb.id);
+      await ack();
       const where =
         action === "low" ? sql`${products.stock} <= ${products.lowStockThreshold}` : undefined;
       const rows = await db
@@ -891,20 +999,24 @@ async function handleCallbackQuery(cb: TelegramCallbackQuery) {
         .where(where)
         .orderBy(products.name)
         .limit(15);
-      const body = rows.length
-        ? rows.map((p) => `${p.name} | ${p.sku} | ${p.stock}`).join("\n")
-        : "لا توجد منتجات.";
-      await editMessage(
-        chatId,
-        messageId,
-        `📦 ${action === "low" ? "مخزون منخفض" : "المنتجات"}\n${body}`,
-        backButton("menu"),
-      );
+
+      if (!rows.length) {
+        await editMessage(chatId, messageId, "📭 لا توجد منتجات.", backButton("menu"));
+        return;
+      }
+      const title = action === "low" ? "⚠️ <b>مخزون منخفض</b>" : "📦 <b>المنتجات</b>";
+      const body =
+        `${title}\n${DIVIDER}\n\n` +
+        rows
+          .map((p) => `• ${esc(p.name)}\n  <code>${esc(p.sku)}</code>  •  المخزون: <b>${p.stock}</b>`)
+          .join("\n\n");
+      await editMessage(chatId, messageId, body, backButton("menu"));
       return;
     }
 
+    /* ---- stats ---- */
     if (type === "stats") {
-      await answerCallback(cb.id);
+      await ack();
       const [row] = await db
         .select({
           total: sql<number>`count(*)::int`,
@@ -912,54 +1024,56 @@ async function handleCallbackQuery(cb: TelegramCallbackQuery) {
           today: sql<number>`count(*) filter (where ${orders.createdAt} >= date_trunc('day', now()))::int`,
         })
         .from(orders);
-      await editMessage(
-        chatId,
-        messageId,
-        `📊 إحصائيات RIVO\nإجمالي الطلبات: ${row.total}\nالمعلقة: ${row.pending}\nطلبات اليوم: ${row.today}`,
-        backButton("menu"),
-      );
+      const body =
+        `📊 <b>إحصائيات RIVO</b>\n${DIVIDER}\n\n` +
+        `🛒 إجمالي الطلبات: <b>${row.total}</b>\n` +
+        `⏳ المعلقة: <b>${row.pending}</b>\n` +
+        `📅 طلبات اليوم: <b>${row.today}</b>`;
+      await editMessage(chatId, messageId, body, backButton("menu"));
       return;
     }
 
+    /* ---- profits ---- */
     if (type === "profits") {
-      await answerCallback(cb.id);
+      await ack();
       const [row] = await db
         .select({
           realized: sql<number>`coalesce(sum(${orders.profit}) filter (where ${orders.status} = 'delivered' and ${orders.paymentConfirmedAt} is not null),0)::bigint`,
           expected: sql<number>`coalesce(sum(${orders.profit}) filter (where ${orders.status} in ('paid','sent_to_supplier','shipping')),0)::bigint`,
         })
         .from(orders);
-      await editMessage(
-        chatId,
-        messageId,
-        `💰 الأرباح\nالمحققة: ${money(Number(row.realized))}\nالمتوقعة: ${money(Number(row.expected))}`,
-        backButton("menu"),
-      );
+      const body =
+        `💰 <b>الأرباح</b>\n${DIVIDER}\n\n` +
+        `✅ محققة: <b>${money(Number(row.realized))}</b>\n` +
+        `⏳ متوقعة: <b>${money(Number(row.expected))}</b>`;
+      await editMessage(chatId, messageId, body, backButton("menu"));
       return;
     }
 
+    /* ---- managers ---- */
     if (type === "managers") {
-      await answerCallback(cb.id);
+      await ack();
       const rows = await db
         .select()
         .from(telegramManagers)
         .where(eq(telegramManagers.isActive, true))
         .orderBy(telegramManagers.createdAt);
       const body = rows.length
-        ? rows.map((m) => `${m.telegramId} — ${m.name} (${m.role})`).join("\n")
-        : "لا يوجد مديرون.";
-      await editMessage(chatId, messageId, `👥 المدراء\n${body}`, backButton("menu"));
+        ? `👥 <b>المدراء</b>\n${DIVIDER}\n\n` +
+          rows.map((m) => `• <code>${esc(m.telegramId)}</code> — ${esc(m.name)} (${esc(m.role)})`).join("\n")
+        : "👥 لا يوجد مديرون.";
+      await editMessage(chatId, messageId, body, backButton("menu"));
       return;
     }
 
-    await answerCallback(cb.id, "غير معروف", true);
+    await ack("غير معروف", true);
   } catch (error) {
     console.error("callback_failed", {
       data: cb.data,
       senderId,
       error: error instanceof Error ? error.message : "unknown",
     });
-    await answerCallback(cb.id, "⚠️ حدث خطأ غير متوقع", true);
+    await ack("⚠️ حدث خطأ غير متوقع", true);
   }
 }
 
