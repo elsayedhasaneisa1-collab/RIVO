@@ -38,10 +38,10 @@ function TelegramIcon() {
 }
 
 const socialClass =
-  "grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 transition-all duration-300 hover:-translate-y-1 hover:border-electric-500 hover:bg-electric-500 hover:text-white dark:border-white/10 dark:bg-white/5 dark:text-white/65 dark:hover:border-electric-500 dark:hover:bg-electric-500 dark:hover:text-white";
+  "grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-electric-500 hover:bg-electric-500 hover:text-white dark:border-white/10 dark:bg-white/5 dark:text-white/70 dark:shadow-none dark:hover:border-electric-500 dark:hover:bg-electric-500 dark:hover:text-white";
 
 const linkClass =
-  "text-sm text-slate-600 transition-colors hover:text-electric-600 dark:text-white/60 dark:hover:text-electric-400";
+  "text-sm text-slate-700 transition-colors hover:text-electric-600 dark:text-white/65 dark:hover:text-electric-400";
 
 export function Footer({
   settings,
@@ -53,7 +53,7 @@ export function Footer({
   const year = new Date().getFullYear();
 
   return (
-    <footer className="relative mt-24 border-t border-slate-200 bg-white text-slate-900 transition-colors duration-300 dark:border-white/10 dark:bg-ink-900 dark:text-white">
+    <footer className="relative mt-24 overflow-hidden border-t border-slate-200 bg-slate-50 text-slate-900 transition-colors duration-300 dark:border-white/10 dark:bg-ink-900 dark:text-white">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-electric-500/60 to-transparent" />
 
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-2 lg:grid-cols-4">
@@ -118,7 +118,7 @@ export function Footer({
         </div>
 
         <div>
-          <h3 className="mb-4 font-bold">تسوق</h3>
+          <h3 className="mb-4 font-bold text-slate-900 dark:text-white">تسوق</h3>
 
           <ul className="space-y-3">
             <li><Link href="/products" className={linkClass}>كل المنتجات</Link></li>
@@ -129,7 +129,7 @@ export function Footer({
         </div>
 
         <div>
-          <h3 className="mb-4 font-bold">التصنيفات</h3>
+          <h3 className="mb-4 font-bold text-slate-900 dark:text-white">التصنيفات</h3>
 
           <ul className="space-y-3">
             {categories.length === 0 && (
@@ -150,7 +150,7 @@ export function Footer({
         </div>
 
         <div>
-          <h3 className="mb-4 font-bold">خدمة العملاء</h3>
+          <h3 className="mb-4 font-bold text-slate-900 dark:text-white">خدمة العملاء</h3>
 
           <ul className="space-y-3">
             <li><Link href="/track" className={linkClass}>تتبع طلبك</Link></li>
@@ -198,7 +198,7 @@ export function Footer({
         </div>
       </div>
 
-      <div className="border-t border-slate-200 dark:border-white/5">
+      <div className="border-t border-slate-200 bg-white/70 dark:border-white/5 dark:bg-transparent">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-5 px-4 py-6 text-center sm:px-6 md:flex-row">
           <p className="text-xs text-slate-500 dark:text-white/40">
             © {year} {settings.storeName}. جميع الحقوق محفوظة.
@@ -215,7 +215,7 @@ export function Footer({
           </p>
         </div>
 
-        <div className="border-t border-slate-200 px-4 py-4 text-center dark:border-white/5">
+        <div className="border-t border-slate-200 bg-slate-50 px-4 py-4 text-center dark:border-white/5 dark:bg-transparent">
           {settings.whatsappNumber || settings.supportPhone ? (
             <a
               href={`https://wa.me/${(settings.whatsappNumber || settings.supportPhone || "").replace(/\D/g, "")}?text=${encodeURIComponent("مرحبًا، أريد الاستفسار عن تطوير موقع ويب.")}`}
