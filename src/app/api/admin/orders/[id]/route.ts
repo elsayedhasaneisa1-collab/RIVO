@@ -8,6 +8,8 @@ import { logAudit } from "@/lib/server/audit";
 import { requireAdmin } from "@/lib/server/auth";
 import { transitionOrder } from "@/lib/server/orders";
 import { cleanText } from "@/lib/server/security";
+import { notifyTelegramOrderStatus } from "@/lib/server/integrations/telegram";
+import { notifyWhatsappOrderStatus } from "@/lib/server/integrations/whatsapp";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +56,9 @@ export const PATCH = route(async (req, ctx: Ctx) => {
   if (body.status) {
     const r = await transitionOrder(id, body.status, user, body.note);
     await logAudit({ user, action: "status_change", entity: "order", entityId: id, details: { reference: r.reference, from: r.from, to: r.to, note: body.note ?? null }, req });
+    await notifyTelegramOrderStatus(r.reference, r.from, r.to);
+    const [orderForNotice] = await db.select({ name: orders.name, phone: orders.phone, whatsappUpdatesConsent: orders.whatsappUpdatesConsent }).from(orders).where(eq(orders.id, id)).limit(1);
+    if (orderForNotice?.whatsappUpdatesConsent) await notifyWhatsappOrderStatus(orderForNotice.phone, orderForNotice.name, r.reference, r.to);
   }
   const fields: Partial<typeof orders.$inferInsert> = {};
   if (body.supplierOrderRef !== undefined) fields.supplierOrderRef = body.supplierOrderRef || null;

@@ -41,6 +41,7 @@ export const checkoutSchema = z.object({
   area: text(2, 80, "المنطقة مطلوبة"),
   address: text(8, 300, "العنوان التفصيلي يجب أن يكون 8 أحرف على الأقل"),
   notes: z.string().transform(cleanText).pipe(z.string().max(500, "الملاحظات طويلة جدًا")).optional().nullable(),
+  whatsappUpdatesConsent: z.boolean().optional().default(false),
   website: z.string().max(0).optional(),
 });
 
@@ -175,6 +176,13 @@ export async function createOrder(input: CheckoutInput, ipHash: string): Promise
   const items = normalizeItems(input.items);
 
   return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.idempotencyKey}))`);
+    const concurrentDuplicate = await tx.select().from(orders).where(eq(orders.idempotencyKey, input.idempotencyKey)).limit(1);
+    if (concurrentDuplicate[0]) {
+      const o = concurrentDuplicate[0];
+      if (o.phone !== input.phone) throw new ApiError(409, "تعذر إنشاء الطلب، أعد المحاولة", "idempotency_conflict");
+      return { reference: o.reference, total: o.total, subtotal: o.subtotal, discount: o.discount, shippingFee: o.shippingFee, createdAt: o.createdAt.toISOString(), duplicate: true };
+    }
     const ids = items.map((i) => i.productId).sort((a, b) => a - b);
     const rows = await tx
       .select({ id: products.id, name: products.name, slug: products.slug, sku: products.sku, price: products.price, costPrice: products.costPrice, stock: products.stock, images: products.images, isActive: products.isActive })
@@ -245,6 +253,8 @@ export async function createOrder(input: CheckoutInput, ipHash: string): Promise
         address: input.address,
         notes: input.notes || null,
         status: "pending",
+        paymentExpiresAt: new Date(Date.now() + Math.max(1, Math.min(168, Number(process.env.ORDER_PAYMENT_TIMEOUT_HOURS) || 24)) * 3600_000),
+        whatsappUpdatesConsent: input.whatsappUpdatesConsent,
         subtotal,
         discount,
         shippingFee,

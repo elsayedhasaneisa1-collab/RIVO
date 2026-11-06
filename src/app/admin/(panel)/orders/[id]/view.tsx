@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Copy, Loader2, MapPin, MessageCircle, Phone, Send, Truck } from "lucide-react";
+import { ArrowRight, Copy, Loader2, MapPin, MessageCircle, Phone, Printer, Send, Truck } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { Card, ErrorBox, Loading, Modal, StatusBadge, useAdminData, useToast } from "@/components/admin/ui";
@@ -102,8 +102,19 @@ export function OrderDetail({ id }: { id: string }) {
           <h1 className="font-display text-2xl font-bold sm:text-3xl" dir="ltr">{o.reference}</h1>
           <p className="mt-1 text-sm text-white/50">{formatDate(o.createdAt)}</p>
         </div>
-        <StatusBadge status={o.status} />
+        <div className="flex items-center gap-2"><button onClick={() => window.print()} className="btn-ghost !py-2 text-sm print:hidden"><Printer className="h-4 w-4" /> طباعة الفاتورة</button><StatusBadge status={o.status} /></div>
       </div>
+
+      <section className="print-invoice" dir="rtl">
+        <div className="mb-6 flex items-start justify-between border-b pb-4">
+          <div><h1 className="text-2xl font-black">RIVO</h1><p className="mt-1 text-sm">فاتورة طلب</p></div>
+          <div className="text-left text-sm"><p>رقم الطلب: {o.reference}</p><p>التاريخ: {formatDate(o.createdAt)}</p><p>الحالة: {STATUS_LABELS[o.status]}</p></div>
+        </div>
+        <div className="mb-5 text-sm leading-7"><p><strong>العميل:</strong> {o.name}</p><p><strong>الهاتف:</strong> {o.phone}</p><p><strong>العنوان:</strong> {o.governorate}، {o.city}، {o.area}، {o.address}</p></div>
+        <table className="w-full border-collapse text-sm"><thead><tr><th className="border p-2 text-right">المنتج</th><th className="border p-2">SKU</th><th className="border p-2">الكمية</th><th className="border p-2">السعر</th><th className="border p-2">الإجمالي</th></tr></thead><tbody>{data.items.map((it) => <tr key={it.id}><td className="border p-2">{it.name}</td><td className="border p-2" dir="ltr">{it.sku}</td><td className="border p-2 text-center">{it.quantity}</td><td className="border p-2 text-center">{formatMoney(it.unitPrice)}</td><td className="border p-2 text-center">{formatMoney(it.lineTotal)}</td></tr>)}</tbody></table>
+        <div className="mr-auto mt-5 w-full max-w-xs space-y-2 text-sm"><p className="flex justify-between"><span>الإجمالي الفرعي</span><strong>{formatMoney(o.subtotal)}</strong></p><p className="flex justify-between"><span>الخصم</span><strong>{formatMoney(o.discount)}</strong></p><p className="flex justify-between"><span>الشحن</span><strong>{formatMoney(o.shippingFee)}</strong></p><p className="flex justify-between border-t pt-2 text-lg"><span>الإجمالي النهائي</span><strong>{formatMoney(o.total)}</strong></p></div>
+        <p className="mt-8 border-t pt-3 text-center text-xs">شكرًا لتسوقك من RIVO</p>
+      </section>
 
       {data.allowedTransitions.length > 0 && (
         <Card>

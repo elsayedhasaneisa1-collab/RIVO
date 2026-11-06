@@ -11,5 +11,5 @@ export const metadata: Metadata = { title: "إعداد المتجر", robots: { 
 export default async function SetupPage() {
   const r = await db.select({ c: sql<number>`count(*)::int` }).from(users);
   if (Number(r[0]?.c ?? 0) > 0) redirect("/admin/login");
-  return <SetupForm requiresToken={Boolean(process.env.ADMIN_SETUP_TOKEN)} />;
+  return <SetupForm requiresToken={true} />;
 }

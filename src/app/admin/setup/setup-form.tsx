@@ -46,7 +46,7 @@ export function SetupForm({ requiresToken }: { requiresToken: boolean }) {
         {input("email", "البريد الإلكتروني", "email")}
         {input("password", "كلمة المرور (10 أحرف على الأقل)", "password")}
         {input("confirm", "تأكيد كلمة المرور", "password")}
-        {requiresToken && input("setupToken", "رمز الإعداد (ADMIN_SETUP_TOKEN)", "password")}
+        {input("setupToken", "رمز الإعداد (ADMIN_SETUP_TOKEN)", "password")}
         {error && <p className="rounded-xl bg-rose-500/10 p-3 text-sm text-rose-300" role="alert">{error}</p>}
         <button disabled={loading} className="btn-primary w-full">{loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "إنشاء الحساب والدخول"}</button>
       </form>

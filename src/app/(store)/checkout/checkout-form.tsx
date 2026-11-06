@@ -12,7 +12,8 @@ import { useQuote } from "@/lib/client/use-quote";
 import { GOVERNORATES } from "@/lib/constants";
 import { formatMoney } from "@/lib/format";
 
-type Form = { name: string; phone: string; altPhone: string; governorate: string; city: string; area: string; address: string; notes: string; website: string };
+type Form = { name: string; phone: string; altPhone: string; governorate: string; city: string; area: string; address: string; notes: string; website: string; whatsappUpdatesConsent: boolean };
+type StringFormKey = Exclude<keyof Form, "whatsappUpdatesConsent">;
 
 type OrderResponse = {
   order: { reference: string; total: number; subtotal: number; discount: number; shippingFee: number; createdAt: string };
@@ -22,7 +23,7 @@ type OrderResponse = {
 export function CheckoutForm({ paymentMethods }: { paymentMethods: { label: string; details: string }[] }) {
   const router = useRouter();
   const { items, ready, clear } = useCart();
-  const [form, setForm] = useState<Form>({ name: "", phone: "", altPhone: "", governorate: "", city: "", area: "", address: "", notes: "", website: "" });
+  const [form, setForm] = useState<Form>({ name: "", phone: "", altPhone: "", governorate: "", city: "", area: "", address: "", notes: "", website: "", whatsappUpdatesConsent: false });
   const [couponInput, setCouponInput] = useState("");
   const [coupon, setCoupon] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -32,7 +33,7 @@ export function CheckoutForm({ paymentMethods }: { paymentMethods: { label: stri
 
   const { quote, loading } = useQuote(items, { couponCode: coupon, governorate: form.governorate || null });
 
-  const set = (k: keyof Form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const set = (k: StringFormKey) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setForm((f) => ({ ...f, [k]: e.target.value }));
     setErrors((er) => ({ ...er, [k]: "" }));
   };
@@ -75,6 +76,7 @@ export function CheckoutForm({ paymentMethods }: { paymentMethods: { label: stri
           area: form.area,
           address: form.address,
           notes: form.notes || null,
+          whatsappUpdatesConsent: form.whatsappUpdatesConsent,
           website: form.website,
         },
       });
@@ -102,7 +104,7 @@ export function CheckoutForm({ paymentMethods }: { paymentMethods: { label: stri
     );
   }
 
-  const field = (k: keyof Form, label: string, props: React.InputHTMLAttributes<HTMLInputElement> = {}) => (
+  const field = (k: StringFormKey, label: string, props: React.InputHTMLAttributes<HTMLInputElement> = {}) => (
     <div>
       <label htmlFor={`f-${k}`} className="label">{label}</label>
       <input id={`f-${k}`} value={form[k]} onChange={set(k)} aria-invalid={Boolean(errors[k])} aria-describedby={errors[k] ? `e-${k}` : undefined} className={`input ${errors[k] ? "!border-rose-400/70" : ""}`} {...props} />
@@ -138,6 +140,12 @@ export function CheckoutForm({ paymentMethods }: { paymentMethods: { label: stri
               {field("city", "المدينة *", { maxLength: 60, autoComplete: "address-level2" })}
               {field("area", "المنطقة *", { maxLength: 80 })}
               <div className="sm:col-span-3">{field("address", "العنوان التفصيلي *", { maxLength: 300, placeholder: "الشارع، رقم العقار، الدور، الشقة، علامة مميزة", autoComplete: "street-address" })}</div>
+              <div className="sm:col-span-3">
+                <label className="flex cursor-pointer items-start gap-2 text-sm leading-6 text-white/65">
+                  <input type="checkbox" checked={form.whatsappUpdatesConsent} onChange={(e) => setForm((f) => ({ ...f, whatsappUpdatesConsent: e.target.checked }))} className="mt-1 h-4 w-4 accent-cyan-500" />
+                  أوافق على استلام تحديثات حالة طلبي عبر واتساب.
+                </label>
+              </div>
               <div className="sm:col-span-3">
                 <label htmlFor="f-notes" className="label">ملاحظات الطلب (اختياري)</label>
                 <textarea id="f-notes" value={form.notes} onChange={set("notes")} maxLength={500} rows={3} className="input resize-none" />

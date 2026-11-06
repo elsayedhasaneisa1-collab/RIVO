@@ -128,6 +128,8 @@ export const orders = pgTable(
     profit: integer("profit").notNull().default(0),
     couponCode: text("coupon_code"),
     paymentMethod: text("payment_method").notNull().default("manual_transfer"),
+    whatsappUpdatesConsent: boolean("whatsapp_updates_consent").notNull().default(false),
+    paymentExpiresAt: timestamp("payment_expires_at", { withTimezone: true }),
     paymentConfirmedAt: timestamp("payment_confirmed_at", { withTimezone: true }),
     paymentConfirmedBy: integer("payment_confirmed_by"),
     deliveredAt: timestamp("delivered_at", { withTimezone: true }),
@@ -138,7 +140,7 @@ export const orders = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("orders_status_idx").on(t.status), index("orders_phone_idx").on(t.phone), index("orders_created_idx").on(t.createdAt)],
+  (t) => [index("orders_status_idx").on(t.status), index("orders_phone_idx").on(t.phone), index("orders_created_idx").on(t.createdAt), index("orders_payment_expiry_idx").on(t.status, t.paymentExpiresAt)],
 );
 
 export const orderItems = pgTable(
@@ -206,4 +208,18 @@ export const rateLimits = pgTable(
     resetAt: timestamp("reset_at", { withTimezone: true }).notNull(),
   },
   (t) => [uniqueIndex("rate_limits_key_idx").on(t.key)],
+);
+
+
+export const telegramManagers = pgTable(
+  "telegram_managers",
+  {
+    id: serial("id").primaryKey(),
+    telegramId: text("telegram_id").notNull().unique(),
+    name: text("name").notNull().default("Manager"),
+    role: text("role").notNull().default("staff"),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("telegram_managers_active_idx").on(t.isActive)],
 );

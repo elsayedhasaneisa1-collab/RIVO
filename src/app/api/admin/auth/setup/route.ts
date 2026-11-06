@@ -13,7 +13,7 @@ const schema = z.object({
   name: z.string().transform(cleanText).pipe(z.string().min(2).max(60)),
   email: z.string().trim().toLowerCase().email("بريد غير صالح").max(120),
   password: z.string().min(10, "كلمة المرور 10 أحرف على الأقل").max(200),
-  setupToken: z.string().max(200).optional(),
+  setupToken: z.string().min(1, "رمز الإعداد مطلوب").max(200),
 });
 
 async function needsSetup() {
@@ -26,7 +26,8 @@ export const GET = route(async () => ok({ needsSetup: await needsSetup(), requir
 export const POST = route(async (req) => {
   await limitByIp(req, "setup", 5, 900);
   const body = await parseBody(req, schema);
-  if (process.env.ADMIN_SETUP_TOKEN && body.setupToken !== process.env.ADMIN_SETUP_TOKEN) throw new ApiError(403, "رمز الإعداد غير صحيح", "forbidden");
+  if (!process.env.ADMIN_SETUP_TOKEN) throw new ApiError(503, "يجب ضبط ADMIN_SETUP_TOKEN في إعدادات الاستضافة أولًا", "setup_token_missing");
+  if (body.setupToken !== process.env.ADMIN_SETUP_TOKEN) throw new ApiError(403, "رمز الإعداد غير صحيح", "forbidden");
   const passwordHash = await hashPassword(body.password);
   const created = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(424242)`);
