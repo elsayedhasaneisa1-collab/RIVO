@@ -44,7 +44,7 @@ export async function sendTelegramText(text: string, chatId = groupId()) {
 
 export async function notifyTelegramNewOrder(order: { reference: string; name: string; phone: string; total: number }) {
   await sendTelegramText(
-    `🛒 طلب جديد في RIVO\nرقم الطلب: ${order.reference}\nالعميل: ${order.name}\nالهاتف: ${order.phone}\nالإجمالي: ${(order.total / 100).toLocaleString("ar-EG")} ج.م\n\nاستخدم /order ${order.reference} للتفاصيل.`,
+    `🛒 طلب جديد في RIVO\nرقم الطلب: ${order.reference}\nالإجمالي: ${(order.total / 100).toLocaleString("ar-EG")} ج.م\n\nلعرض التفاصيل، استخدم /order ${order.reference} في المحادثة الخاصة مع البوت.`,
   );
 }
 
@@ -99,6 +99,12 @@ async function runCommand(message: TelegramMessage) {
 
   if (groupId() && message.chat.type !== "private" && String(chatId) !== groupId()) {
     await reply(chatId, "⛔ هذا الجروب غير معتمد لبوت RIVO.");
+    return;
+  }
+
+  const privateOnly = ["/stats", "/profits", "/managers", "/orders", "/neworders", "/pending", "/order", "/activity"];
+  if (privateOnly.includes(command) && message.chat.type !== "private") {
+    await reply(chatId, "🔒 حفاظًا على خصوصية العملاء وبيانات المتجر، استخدم هذا الأمر في المحادثة الخاصة مع البوت.");
     return;
   }
 
@@ -163,7 +169,7 @@ async function runCommand(message: TelegramMessage) {
       : command === "/pending"
         ? await query.where(inArray(orders.status, ["pending", "payment_review"])).orderBy(desc(orders.createdAt)).limit(10)
         : await query.orderBy(desc(orders.createdAt)).limit(10);
-    await reply(chatId, rows.length ? `🛒 الطلبات\n${rows.map((o) => `${o.reference} | ${o.name} | ${money(o.total)} | ${o.status}`).join("\n")}` : "لا توجد طلبات.");
+    await reply(chatId, rows.length ? `🛒 الطلبات\n${rows.map((o) => `${o.reference} | ${money(o.total)} | ${o.status}`).join("\n")}` : "لا توجد طلبات.");
     return;
   }
 
