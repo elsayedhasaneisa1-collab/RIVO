@@ -3,6 +3,7 @@ import { Cairo, Space_Grotesk } from "next/font/google";
 import type { ReactNode } from "react";
 import { CartProvider } from "@/components/store/cart-context";
 import { ServiceWorker } from "@/components/ui/service-worker";
+import { MetaPixel } from "@/components/MetaPixel"; // 👈 تمت الإضافة
 import { SITE_DESCRIPTION, SITE_NAME, SITE_SLOGAN, SITE_URL } from "@/lib/site";
 import "./globals.css";
 
@@ -45,6 +46,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body className="min-h-screen bg-ink-950 text-white antialiased">
         <CartProvider>{children}</CartProvider>
         <ServiceWorker />
+        <MetaPixel /> {/* 👈 تمت الإضافة */}
       </body>
     </html>
   );
