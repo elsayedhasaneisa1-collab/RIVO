@@ -32,12 +32,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
   }
 
+  // log أي update فيه callback عشان تعرف لو الأزرار بتوصل
+  const u = update as Record<string, unknown>;
+  if (u?.callback_query) {
+    const cb = u.callback_query as { data?: string; from?: { id?: number } };
+    console.log("[telegram] callback received", {
+      data: cb.data,
+      from: cb.from?.id,
+    });
+  }
+
   try {
     await handleTelegramUpdate(update as Parameters<typeof handleTelegramUpdate>[0]);
   } catch (error) {
     console.error("telegram_webhook_failed", error instanceof Error ? error.message : "unknown");
   }
 
-  // دائمًا 200 — عشان Telegram ما يعيدش المحاولة ويكرر الأوامر
   return NextResponse.json({ ok: true });
 }
