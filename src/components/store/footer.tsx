@@ -29,6 +29,14 @@ function TikTokIcon() {
   );
 }
 
+function TelegramIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5" aria-hidden="true">
+      <path d="M21.7 4.3 18.6 19c-.2 1-1 1.2-1.8.7l-4.9-3.6-2.4 2.3c-.3.3-.5.5-1 .5l.4-5 9.1-8.2c.4-.4-.1-.6-.6-.2L6.2 12.7 1.4 11.2c-1-.3-1-1 .2-1.5L20.3 2.4c.9-.3 1.7.2 1.4 1.9Z" />
+    </svg>
+  );
+}
+
 const socialClass =
   "grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 transition-all duration-300 hover:-translate-y-1 hover:border-electric-500 hover:bg-electric-500 hover:text-white dark:border-white/10 dark:bg-white/5 dark:text-white/65 dark:hover:border-electric-500 dark:hover:bg-electric-500 dark:hover:text-white";
 
@@ -61,6 +69,16 @@ export function Footer({
           </p>
 
           <div className="flex gap-2">
+            <a
+              href={process.env.NEXT_PUBLIC_TELEGRAM_CHANNEL_URL || "https://t.me/RivoStoreChannel"}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Telegram"
+              className={socialClass}
+            >
+              <TelegramIcon />
+            </a>
+
             {settings.socialFacebook && (
               <a
                 href={settings.socialFacebook}
@@ -198,12 +216,22 @@ export function Footer({
         </div>
 
         <div className="border-t border-slate-200 px-4 py-4 text-center dark:border-white/5">
-          <span
-            className="font-mono text-xs tracking-wide text-slate-400 transition-colors hover:text-electric-500 dark:text-white/35 dark:hover:text-electric-400"
-            dir="ltr"
-          >
-            &lt;Developed by elsayed hasan/&gt;
-          </span>
+          {settings.whatsappNumber || settings.supportPhone ? (
+            <a
+              href={`https://wa.me/${(settings.whatsappNumber || settings.supportPhone || "").replace(/\D/g, "")}?text=${encodeURIComponent("مرحبًا، أريد الاستفسار عن تطوير موقع ويب.")}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-full px-3 py-2 font-mono text-xs tracking-wide text-slate-500 transition-colors hover:text-electric-600 dark:text-white/45 dark:hover:text-electric-400"
+              dir="ltr"
+            >
+              <span>&lt;Developed by EL-sayed Hasan/&gt;</span>
+              <MessageCircle className="h-4 w-4" />
+            </a>
+          ) : (
+            <span className="font-mono text-xs tracking-wide text-slate-500 dark:text-white/45" dir="ltr">
+              &lt;Developed by EL-sayed Hasan/&gt;
+            </span>
+          )}
         </div>
       </div>
     </footer>

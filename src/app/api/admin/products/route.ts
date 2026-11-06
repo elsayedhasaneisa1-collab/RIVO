@@ -66,7 +66,7 @@ export const POST = route(async (req) => {
   await logAudit({ user, action: "create", entity: "product", entityId: p.id, details: { name: values.name, sku: values.sku, price: values.price, cost: values.costPrice }, req });
   if (values.isActive) {
     try {
-      const sent = await notifyTelegramNewProduct({
+      const messageId = await notifyTelegramNewProduct({
         name: values.name,
         slug: values.slug,
         description: values.description,
@@ -75,7 +75,11 @@ export const POST = route(async (req) => {
         compareAtPrice: values.compareAtPrice,
         stock: values.stock,
       });
-      if (!sent) console.error(`telegram_product_post_failed: product ${p.id}`);
+      if (messageId) {
+        await db.update(products).set({ telegramMessageId: messageId }).where(eq(products.id, p.id));
+      } else {
+        console.error(`telegram_product_post_failed: product ${p.id}`);
+      }
     } catch (error) {
       console.error("telegram_product_post_error", error instanceof Error ? error.message : "unknown");
     }

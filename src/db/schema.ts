@@ -53,6 +53,7 @@ export const products = pgTable(
     lowStockThreshold: integer("low_stock_threshold").notNull().default(5),
     isActive: boolean("is_active").notNull().default(true),
     isFeatured: boolean("is_featured").notNull().default(false),
+    telegramMessageId: integer("telegram_message_id"),
     supplier: text("supplier").notNull().default("manual"),
     supplierProductId: text("supplier_product_id"),
     supplierUrl: text("supplier_url"),

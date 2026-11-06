@@ -209,7 +209,7 @@ export async function sendTelegramText(text: string, chatId = groupId()) {
   await sendMessage(Number(chatId), text);
 }
 
-export async function notifyTelegramNewProduct(product: {
+export type TelegramProduct = {
   name: string;
   slug: string;
   description: string;
@@ -217,16 +217,12 @@ export async function notifyTelegramNewProduct(product: {
   price: number;
   compareAtPrice: number | null;
   stock: number;
-}) {
-  const channelId = process.env.RIVO_TELEGRAM_CHANNEL_ID?.trim();
-  if (!channelId || !token()) {
-    console.error("telegram_product_post_skipped: channel or bot token is missing");
-    return false;
-  }
+};
 
+function buildProductCaption(product: TelegramProduct): string {
   const productUrl = `${SITE_URL}/products/${encodeURIComponent(product.slug)}`;
   const description = product.description.trim().slice(0, 500);
-  const caption =
+  return (
     `🆕 <b>منتج جديد في RIVO</b>\n\n` +
     `📦 <b>${esc(product.name)}</b>\n` +
     `💰 السعر: <b>${money(product.price)}</b>\n` +
@@ -235,15 +231,25 @@ export async function notifyTelegramNewProduct(product: {
       : "") +
     `📊 المخزون: ${product.stock > 0 ? `${product.stock} قطعة` : "غير متوفر حاليًا"}\n` +
     (description ? `\n${esc(description)}\n` : "\n") +
-    `\n<a href="${esc(productUrl)}">شاهد المنتج واطلبه الآن</a>`;
+    `\n<a href="${esc(productUrl)}">شاهد المنتج واطلبه الآن</a>`
+  );
+}
 
+function productPhoto(product: TelegramProduct): string | null {
   const firstImage = product.images[0];
-  const photo = firstImage
-    ? firstImage.startsWith("/")
-      ? `${SITE_URL}${firstImage}`
-      : firstImage
-    : null;
+  if (!firstImage) return null;
+  return firstImage.startsWith("/") ? `${SITE_URL}${firstImage}` : firstImage;
+}
 
+export async function notifyTelegramNewProduct(product: TelegramProduct): Promise<number | null> {
+  const channelId = process.env.RIVO_TELEGRAM_CHANNEL_ID?.trim();
+  if (!channelId || !token()) {
+    console.error("telegram_product_post_skipped: channel or bot token is missing");
+    return null;
+  }
+
+  const caption = buildProductCaption(product);
+  const photo = productPhoto(product);
   const result = photo
     ? await telegramRequest("sendPhoto", {
         chat_id: channelId,
@@ -258,6 +264,63 @@ export async function notifyTelegramNewProduct(product: {
         disable_web_page_preview: false,
       });
 
+  const messageId = result?.result?.message_id;
+  return result?.ok && Number.isInteger(messageId) ? Number(messageId) : null;
+}
+
+export async function updateTelegramProductPost(
+  product: TelegramProduct,
+  messageId: number,
+): Promise<number | null> {
+  const channelId = process.env.RIVO_TELEGRAM_CHANNEL_ID?.trim();
+  if (!channelId || !token()) return null;
+  const caption = buildProductCaption(product);
+  const photo = productPhoto(product);
+
+  if (photo) {
+    const mediaResult = await telegramRequest("editMessageMedia", {
+      chat_id: channelId,
+      message_id: messageId,
+      media: {
+        type: "photo",
+        media: photo,
+        caption,
+        parse_mode: "HTML",
+      },
+    });
+    if (mediaResult?.ok || mediaResult?.notModified) return messageId;
+  }
+
+  const captionResult = await telegramRequest("editMessageCaption", {
+    chat_id: channelId,
+    message_id: messageId,
+    caption,
+    parse_mode: "HTML",
+  });
+  if (captionResult?.ok) return messageId;
+  if (captionResult?.notModified) return messageId;
+
+  const textResult = await telegramRequest("editMessageText", {
+    chat_id: channelId,
+    message_id: messageId,
+    text: caption,
+    parse_mode: "HTML",
+    disable_web_page_preview: false,
+  });
+  if (textResult?.ok || textResult?.notModified) return messageId;
+
+  const deleted = await deleteTelegramProductPost(messageId);
+  if (!deleted) return null;
+  return notifyTelegramNewProduct(product);
+}
+
+export async function deleteTelegramProductPost(messageId: number): Promise<boolean> {
+  const channelId = process.env.RIVO_TELEGRAM_CHANNEL_ID?.trim();
+  if (!channelId || !token()) return false;
+  const result = await telegramRequest("deleteMessage", {
+    chat_id: channelId,
+    message_id: messageId,
+  });
   return Boolean(result?.ok);
 }
 
