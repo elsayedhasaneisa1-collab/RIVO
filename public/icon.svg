@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="bag" x1="112" y1="90" x2="400" y2="430" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#C084FC"/>
+      <stop offset=".52" stop-color="#9333EA"/>
+      <stop offset="1" stop-color="#6D28D9"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="150" y1="110" x2="350" y2="390" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F5D0FE"/>
+      <stop offset="1" stop-color="#A855F7"/>
+    </linearGradient>
+    <filter id="glow" x="40" y="35" width="432" height="442" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feGaussianBlur stdDeviation="18" result="blur"/>
+      <feColorMatrix in="blur" values="0 0 0 0 .55 0 0 0 0 .2 0 0 0 0 .95 0 0 0 .65 0"/>
+      <feBlend in="SourceGraphic"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="#100B1B"/>
+  <rect x="5" y="5" width="502" height="502" rx="112" stroke="#A855F7" stroke-opacity=".22" stroke-width="10"/>
+  <g filter="url(#glow)">
+    <path d="M174 190v-35c0-46 37-83 82-83s82 37 82 83v35" stroke="url(#shine)" stroke-width="25" stroke-linecap="round"/>
+    <path d="M112 184c2-17 16-30 33-30h222c17 0 31 13 33 30l24 220c3 26-17 48-43 48H131c-26 0-46-22-43-48l24-220Z" fill="url(#bag)"/>
+    <path d="M157 218h198l17 170H140l17-170Z" fill="#160D25" fill-opacity=".34"/>
+    <path d="M177 286c0-22 18-40 40-40h78c22 0 40 18 40 40v53h-43v-51c0-5-4-9-9-9h-54c-5 0-9 4-9 9v51h-43v-53Z" fill="#FFF"/>
+    <path d="M177 339h158v38H177z" fill="#FFF"/>
+    <path d="M177 377h158v18H177z" fill="#E9D5FF"/>
+  </g>
+</svg>
