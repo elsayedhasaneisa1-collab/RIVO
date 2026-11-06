@@ -5,6 +5,7 @@ import { transitionOrder } from "@/lib/server/orders";
 import type { AdminUser } from "@/lib/server/auth";
 import { STATUS_LABELS, type OrderStatus } from "@/lib/constants";
 import { notifyWhatsappOrderStatus } from "@/lib/server/integrations/whatsapp";
+import { SITE_URL } from "@/lib/site";
 
 /* ----------------------------- Types ----------------------------- */
 
@@ -206,6 +207,58 @@ async function sendWelcome(chatId: number, role: BotRole | null) {
 export async function sendTelegramText(text: string, chatId = groupId()) {
   if (!chatId || !token()) return;
   await sendMessage(Number(chatId), text);
+}
+
+export async function notifyTelegramNewProduct(product: {
+  name: string;
+  slug: string;
+  description: string;
+  images: string[];
+  price: number;
+  compareAtPrice: number | null;
+  stock: number;
+}) {
+  const channelId = process.env.RIVO_TELEGRAM_CHANNEL_ID?.trim();
+  if (!channelId || !token()) {
+    console.error("telegram_product_post_skipped: channel or bot token is missing");
+    return false;
+  }
+
+  const productUrl = `${SITE_URL}/products/${encodeURIComponent(product.slug)}`;
+  const description = product.description.trim().slice(0, 500);
+  const caption =
+    `🆕 <b>منتج جديد في RIVO</b>\n\n` +
+    `📦 <b>${esc(product.name)}</b>\n` +
+    `💰 السعر: <b>${money(product.price)}</b>\n` +
+    (product.compareAtPrice && product.compareAtPrice > product.price
+      ? `🏷️ قبل الخصم: <s>${money(product.compareAtPrice)}</s>\n`
+      : "") +
+    `📊 المخزون: ${product.stock > 0 ? `${product.stock} قطعة` : "غير متوفر حاليًا"}\n` +
+    (description ? `\n${esc(description)}\n` : "\n") +
+    `\n<a href="${esc(productUrl)}">شاهد المنتج واطلبه الآن</a>`;
+
+  const firstImage = product.images[0];
+  const photo = firstImage
+    ? firstImage.startsWith("/")
+      ? `${SITE_URL}${firstImage}`
+      : firstImage
+    : null;
+
+  const result = photo
+    ? await telegramRequest("sendPhoto", {
+        chat_id: channelId,
+        photo,
+        caption,
+        parse_mode: "HTML",
+      })
+    : await telegramRequest("sendMessage", {
+        chat_id: channelId,
+        text: caption,
+        parse_mode: "HTML",
+        disable_web_page_preview: false,
+      });
+
+  return Boolean(result?.ok);
 }
 
 export async function notifyTelegramNewOrder(order: {
