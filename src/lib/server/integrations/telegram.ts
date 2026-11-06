@@ -42,6 +42,8 @@ const BOT_FOOTER = "\n\n━━━━━━━━━━━━━━━━━━\n
 const DEV_PLAIN_REGEX = /Developed by EL-sayed Hasan/i;
 const DEV_TAG_REGEX = /<developed by EL-sayed Hasan\/>/gi;
 
+const DIVIDER = "━━━━━━━━━━━━━━━━━━";
+
 /* ----------------------------- Format helpers ----------------------------- */
 
 function esc(value: unknown): string {
@@ -82,8 +84,6 @@ function statusLabel(status: string): string {
   const label = STATUS_LABELS[status as OrderStatus] ?? status;
   return `${STATUS_EMOJI[status] ?? "•"} ${esc(label)}`;
 }
-
-const DIVIDER = "━━━━━━━━━━━━━━━━━━";
 
 /* ----------------------------- Telegram API ----------------------------- */
 
@@ -141,7 +141,7 @@ async function editMessage(
   });
   if (result && result.notModified) return;
   if (!result) {
-    // fallback: الرسالة ممكن تكون صورة أو مش قابلة للتعديل — نرسل جديدة
+    // الرسالة ممكن تكون صورة — نرسل جديدة
     await sendMessage(chatId, html, keyboard);
   }
 }
@@ -155,25 +155,28 @@ async function answerCallback(callbackId: string, text?: string, showAlert = fal
 }
 
 async function sendWelcomePhoto(chatId: number, role: BotRole | null) {
-  // صورة بدون أزرار
   await telegramRequest("sendPhoto", {
     chat_id: chatId,
     photo: "https://rivo-eight-wine.vercel.app/rivo-bot-welcome.png",
-    caption:
-      "🤖 <b>RIVO BOT</b>\nمساعدك الذكي لإدارة المتجر بسهولة وأمان.",
+    caption: "🤖 <b>RIVO BOT</b>\nمساعدك الذكي لإدارة المتجر بسهولة وأمان.",
     parse_mode: "HTML",
   });
-  // رسالة نصية منفصلة فيها الأزرار (حتى تعمل editMessageText بدون مشاكل)
+
+  // رسالة الأزرار
   await sendMessage(
     chatId,
-    `🎉 <b>أهلاً بك في RIVO BOT</b>\n${DIVIDER}\n\nاختر من القائمة بالأسفل 👇`,
+    `🎉 <b>أهلاً بك في RIVO BOT</b>\n${DIVIDER}\n\nاختر من الأزرار بالأسفل 👇`,
     mainMenu(role),
   );
+
+  // قائمة الأوامر تحت الأزرار
+  await sendMessage(chatId, buildCommandMenu(role));
 }
 
 export async function sendTelegramText(text: string, chatId = groupId()) {
   if (!chatId || !token()) return;
-  await sendMessage(Number(chatId), esc(text));
+  // لا نعمل esc هنا — المُنادي مسؤول عن esc المحتوى الديناميكي
+  await sendMessage(Number(chatId), text);
 }
 
 export async function notifyTelegramNewOrder(order: {
@@ -202,6 +205,62 @@ export async function notifyTelegramOrderStatus(reference: string, from: string,
   await sendTelegramText(body);
 }
 
+/* ----------------------------- Command menu ----------------------------- */
+
+function buildCommandMenu(role: BotRole | null): string {
+  const lines: string[] = [
+    "⌨️ <b>قائمة الأوامر</b>",
+    DIVIDER,
+    "",
+    "🔹 <b>عام</b>",
+    "  ├ <code>/id</code>  →  معرفاتك",
+    "  ├ <code>/ping</code>  →  فحص البوت",
+    "  └ <code>/help</code>  →  المساعدة",
+  ];
+
+  if (role) {
+    lines.push(
+      "",
+      "🛒 <b>الطلبات</b>",
+      "  ├ <code>/neworders</code>  →  الجديدة",
+      "  ├ <code>/pending</code>  →  المعلقة",
+      "  ├ <code>/orders</code>  →  آخر 10 طلبات",
+      "  └ <code>/order رقم</code>  →  تفاصيل طلب",
+      "",
+      "⚙️ <b>تحديث حالة طلب</b>",
+      "  ├ <code>/confirm رقم</code>  →  تأكيد الدفع",
+      "  ├ <code>/ship رقم</code>  →  شحن",
+      "  ├ <code>/delivered رقم</code>  →  تم التسليم",
+      "  └ <code>/cancel رقم</code>  →  إلغاء",
+      "",
+      "📦 <b>المنتجات والمخزون</b>",
+      "  ├ <code>/products</code>  →  الكل",
+      "  ├ <code>/lowstock</code>  →  مخزون منخفض",
+      "  ├ <code>/outstock</code>  →  نافد",
+      "  ├ <code>/search كلمة</code>  →  بحث",
+      "  ├ <code>/product SKU</code>  →  تفاصيل منتج",
+      "  └ <code>/setstock SKU كمية</code>  →  تعديل المخزون",
+      "",
+      "🧾 <code>/activity</code>  →  آخر العمليات",
+    );
+  }
+
+  if (role === "owner") {
+    lines.push(
+      "",
+      "👑 <b>للمالك فقط</b>",
+      "  ├ <code>/stats</code>  →  إحصائيات المتجر",
+      "  ├ <code>/profits</code>  →  الأرباح",
+      "  ├ <code>/managers</code>  →  المدراء",
+      "  ├ <code>/addadmin ID admin|staff</code>  →  إضافة",
+      "  └ <code>/removeadmin ID</code>  →  حذف",
+    );
+  }
+
+  lines.push("", DIVIDER, "💡 <i>اضغط على أي أمر لنسخه تلقائيًا</i>");
+  return lines.join("\n");
+}
+
 /* ----------------------------- Keyboards ----------------------------- */
 
 function mainMenu(role: BotRole | null): InlineKeyboardMarkup {
@@ -224,7 +283,10 @@ function mainMenu(role: BotRole | null): InlineKeyboardMarkup {
       [{ text: "👥 المدراء", callback_data: "managers:list" }],
     );
   }
-  rows.push([{ text: "❓ مساعدة", callback_data: "help" }]);
+  rows.push(
+    [{ text: "🔔 اختبر الأزرار", callback_data: "ping" }],
+    [{ text: "❓ مساعدة", callback_data: "help" }],
+  );
   return { inline_keyboard: rows };
 }
 
@@ -285,43 +347,17 @@ async function findOrder(value: string) {
 
 function buildHelp(role: BotRole | null): string {
   const lines: string[] = [
-    "📋 <b>أوامر RIVO BOT</b>",
+    "📋 <b>مساعدة RIVO BOT</b>",
     DIVIDER,
     "",
-    "🔹 <b>عام:</b>",
-    "/id — معرفة المعرفات",
-    "/help — المساعدة",
+    "استخدم الأزرار بالأعلى أو اكتب أي أمر من القائمة.",
+    "كل الأوامر مكتوبة بلون مختلف — اضغط عليها لتنسخها تلقائيًا.",
   ];
-  if (role) {
+  if (!role) {
     lines.push(
       "",
-      "🔷 <b>للمديرين:</b>",
-      "/orders — آخر الطلبات",
-      "/neworders — الطلبات الجديدة",
-      "/pending — الطلبات المعلقة",
-      "/order رقم — تفاصيل طلب",
-      "/confirm رقم — تأكيد الدفع",
-      "/cancel رقم — إلغاء طلب",
-      "/ship رقم — تحديث الشحن",
-      "/delivered رقم — تأكيد التسليم",
-      "/products — المنتجات",
-      "/product SKU — تفاصيل منتج",
-      "/search كلمة — البحث",
-      "/lowstock — مخزون منخفض",
-      "/outstock — منتجات نافدة",
-      "/setstock SKU كمية — تعديل المخزون",
-      "/activity — آخر العمليات",
-    );
-  }
-  if (role === "owner") {
-    lines.push(
-      "",
-      "👑 <b>للمالك فقط:</b>",
-      "/stats — إحصائيات المتجر",
-      "/profits — الأرباح",
-      "/managers — المدراء",
-      "/addadmin ID admin|staff — إضافة مدير",
-      "/removeadmin ID — حذف مدير",
+      "⛔ حسابك غير مصرح بعد.",
+      "أرسل /id للمالك ليضيفك.",
     );
   }
   return lines.join("\n");
@@ -358,6 +394,19 @@ const FORBIDDEN_STATUS: Record<string, string[]> = {
 
 const MUTATING_COMMANDS = new Set(["/confirm", "/cancel", "/ship", "/delivered", "/setstock"]);
 
+/* ----------------------------- Callback parser ----------------------------- */
+
+function parseCbData(data: string): { type: string; action: string; reference: string } {
+  const i = data.indexOf(":");
+  if (i === -1) return { type: data, action: "", reference: "" };
+  const type = data.slice(0, i);
+  const rest = data.slice(i + 1);
+  if (type === "view") return { type, action: "", reference: rest };
+  const j = rest.indexOf(":");
+  if (j === -1) return { type, action: rest, reference: "" };
+  return { type, action: rest.slice(0, j), reference: rest.slice(j + 1) };
+}
+
 /* ----------------------------- Command router ----------------------------- */
 
 async function runCommand(message: TelegramMessage) {
@@ -373,6 +422,7 @@ async function runCommand(message: TelegramMessage) {
     return;
   }
 
+  // أوامر عامة — قبل التحقق من الصلاحية
   if (command === "/id") {
     await reply(
       chatId,
@@ -381,12 +431,40 @@ async function runCommand(message: TelegramMessage) {
     return;
   }
 
-  if (command === "/start" || command === "/help") {
+  if (command === "/ping") {
+    const hasToken = Boolean(token());
+    const hasOwner = Boolean(ownerId());
+    const hasGroup = Boolean(groupId());
     const role = await getRole(senderId);
-    if (command === "/start") {
-      await sendWelcomePhoto(chatId, role);
-      return;
-    }
+    await reply(
+      chatId,
+      `🏓 <b>Pong!</b>\n${DIVIDER}\n\n` +
+        `🔑 Bot Token: ${hasToken ? "✅" : "❌"}\n` +
+        `👤 Owner ID: ${hasOwner ? "✅" : "❌"}\n` +
+        `👥 Group ID: ${hasGroup ? "✅" : "❌"}\n` +
+        `💬 Chat Type: ${esc(message.chat.type ?? "unknown")}\n` +
+        `🆔 Your ID: <code>${esc(senderId)}</code>\n` +
+        `🎖️ Your Role: ${role ?? "غير مصرح"}\n\n` +
+        `🔔 <i>اضغط الزر بالأسفل لاختبار الأزرار</i>`,
+    );
+    // أزرار الاختبار في رسالة منفصلة
+    await sendMessage(chatId, "👇 اختبر الأزرار:", {
+      inline_keyboard: [
+        [{ text: "🔔 اختبر الأزرار", callback_data: "ping" }],
+        [{ text: "🔙 القائمة", callback_data: "menu" }],
+      ],
+    });
+    return;
+  }
+
+  if (command === "/start") {
+    const role = await getRole(senderId);
+    await sendWelcomePhoto(chatId, role);
+    return;
+  }
+
+  if (command === "/help") {
+    const role = await getRole(senderId);
     await sendMessage(chatId, buildHelp(role), backButton("menu"));
     return;
   }
@@ -568,9 +646,10 @@ async function runCommand(message: TelegramMessage) {
       return;
     }
     const total = rows.reduce((s, o) => s + o.total, 0);
+    const title =
+      command === "/neworders" ? "🛒 <b>الطلبات الجديدة</b>" : command === "/pending" ? "⏳ <b>الطلبات المعلقة</b>" : "🛒 <b>آخر الطلبات</b>";
     const body =
-      `🛒 <b>الطلبات</b>\n` +
-      `${DIVIDER}\n\n` +
+      `${title}\n${DIVIDER}\n\n` +
       `📊 العدد: <b>${rows.length}</b>\n` +
       `💰 الإجمالي: <b>${money(total)}</b>\n\n` +
       `👇 اضغط على طلب لعرض التفاصيل`;
@@ -680,7 +759,7 @@ async function runCommand(message: TelegramMessage) {
       return;
     }
     const title =
-      command === "/lowstock" ? "⚠️ مخزون منخفض" : command === "/outstock" ? "❌ منتجات نافدة" : "📦 المنتجات";
+      command === "/lowstock" ? "⚠️ <b>مخزون منخفض</b>" : command === "/outstock" ? "❌ <b>منتجات نافدة</b>" : "📦 <b>المنتجات</b>";
     const body =
       `${title}\n${DIVIDER}\n\n` +
       rows.map((p) => `• ${esc(p.name)}\n  <code>${esc(p.sku)}</code>  •  المخزون: <b>${p.stock}</b>`).join("\n\n");
@@ -799,17 +878,21 @@ async function handleCallbackQuery(cb: TelegramCallbackQuery) {
     return;
   }
 
+  // رد فوري على ping قبل التحقق من الصلاحية — اختبار
+  const parsed = parseCbData(cb.data);
+  if (parsed.type === "ping") {
+    await answerCallback(cb.id, "✅ الأزرار تعمل بنجاح!", true);
+    return;
+  }
+
   const role = await getRole(senderId);
   if (!role) {
     await answerCallback(cb.id, "⛔ غير مصرح", true);
     return;
   }
 
-  const [type, action = "", ...rest] = cb.data.split(":");
-  // view:REF → reference = action | act:ACTION:REF → reference = rest[0]
-  const reference = type === "view" ? action : (rest[0] ?? "");
+  const { type, action, reference } = parsed;
 
-  // أزرار المالك فقط
   const ownerActions = new Set(["stats", "profits", "managers"]);
   if (ownerActions.has(type)) {
     if (role !== "owner") {
@@ -822,7 +905,12 @@ async function handleCallbackQuery(cb: TelegramCallbackQuery) {
     }
   }
 
-  // ack مرة واحدة فقط لكل callback
+  // منع تعديل الطلبات من الجروبات
+  if (chatType !== "private" && type === "act") {
+    await answerCallback(cb.id, "🔒 التعديل متاح في الخاص فقط", true);
+    return;
+  }
+
   let answered = false;
   const ack = async (text?: string, showAlert = false) => {
     if (answered) return;
@@ -837,7 +925,7 @@ async function handleCallbackQuery(cb: TelegramCallbackQuery) {
       await editMessage(
         chatId,
         messageId,
-        `🎉 <b>القائمة الرئيسية</b>\n${DIVIDER}\n\nاختر من الأزرار بالأسفل 👇`,
+        `🎉 <b>القائمة الرئيسية</b>\n${DIVIDER}\n\nاختر من الأزرار بالأعلى، أو استخدم الأوامر بالأسفل 👇\n\n${buildCommandMenu(role)}`,
         mainMenu(role),
       );
       return;
@@ -910,7 +998,6 @@ async function handleCallbackQuery(cb: TelegramCallbackQuery) {
         return;
       }
 
-      // خطوة تأكيد الإلغاء
       if (action === "cancel") {
         if (FORBIDDEN_STATUS.cancel.includes(order.status)) {
           await ack(`⚠️ لا يمكن الإلغاء (${statusLabel(order.status)})`, true);
@@ -1050,7 +1137,7 @@ async function handleCallbackQuery(cb: TelegramCallbackQuery) {
       return;
     }
 
-    /* ---- managers ---- */
+    /* ---- managers:list ---- */
     if (type === "managers") {
       await ack();
       const rows = await db
@@ -1082,6 +1169,7 @@ async function handleCallbackQuery(cb: TelegramCallbackQuery) {
 export async function handleTelegramUpdate(update: TelegramUpdate) {
   try {
     if (update.callback_query) {
+      console.log("[telegram] handling callback", update.callback_query.data);
       await handleCallbackQuery(update.callback_query);
       return;
     }
