@@ -20,6 +20,17 @@ const token = () => process.env.RIVO_TELEGRAM_BOT_TOKEN;
 const ownerId = () => process.env.RIVO_TELEGRAM_OWNER_ID?.trim();
 const groupId = () => process.env.RIVO_TELEGRAM_GROUP_ID?.trim();
 
+const BOT_FOOTER = "\n\n━━━━━━━━━━━━━━━━━━\nDeveloped by EL-sayed Hasan";
+
+function formatBotMessage(text: string) {
+  const cleanText = text.trim();
+  if (cleanText.includes("Developed by EL-sayed Hasan") || cleanText.includes("<developed by EL-sayed Hasan/>")) {
+    return cleanText.replace("<developed by EL-sayed Hasan/>", "Developed by EL-sayed Hasan");
+  }
+  return `✦ RIVO BOT\n━━━━━━━━━━━━━━━━━━\n${cleanText}${BOT_FOOTER}`;
+}
+
+
 export async function telegramRequest(method: string, body: Record<string, unknown>) {
   const botToken = token();
   if (!botToken) return null;
@@ -36,7 +47,7 @@ export async function telegramRequest(method: string, body: Record<string, unkno
 export async function sendTelegramText(text: string, chatId = groupId()) {
   if (!chatId || !token()) return;
   try {
-    await telegramRequest("sendMessage", { chat_id: chatId, text, disable_web_page_preview: true });
+    await telegramRequest("sendMessage", { chat_id: chatId, text: formatBotMessage(text), disable_web_page_preview: true });
   } catch (error) {
     console.error("telegram_send_failed", error instanceof Error ? error.message : "unknown");
   }
@@ -60,7 +71,16 @@ async function getRole(telegramId: string): Promise<BotRole | null> {
 }
 
 async function reply(chatId: number, text: string) {
-  await telegramRequest("sendMessage", { chat_id: chatId, text, disable_web_page_preview: true });
+  await telegramRequest("sendMessage", { chat_id: chatId, text: formatBotMessage(text), disable_web_page_preview: true });
+}
+
+async function sendWelcomePhoto(chatId: number) {
+  const photo = "https://rivo-eight-wine.vercel.app/rivo-bot-welcome.png";
+  await telegramRequest("sendPhoto", {
+    chat_id: chatId,
+    photo,
+    caption: "🤖 RIVO BOT\nمساعد متجرك الذكي لإدارة الطلبات والمنتجات بسهولة وأمان.\n\nاستخدم /help لعرض الأوامر المتاحة.\n\n<developed by EL-sayed Hasan/>",
+  });
 }
 
 function money(value: number) {
@@ -87,7 +107,8 @@ async function runCommand(message: TelegramMessage) {
     return;
   }
   if (command === "/start" || command === "/help") {
-    await reply(chatId, "🤖 RIVO BOT\n\n/id — معرفة المعرفات\n/help — المساعدة\n\nللمديرين المعتمدين:\n/orders — آخر الطلبات\n/neworders — الطلبات الجديدة\n/pending — الطلبات المعلقة\n/order رقم — تفاصيل طلب\n/confirm رقم — تأكيد الدفع\n/cancel رقم — إلغاء طلب\n/ship رقم — تحديث الشحن\n/delivered رقم — تأكيد التسليم\n/products — المنتجات\n/product SKU — تفاصيل منتج\n/search كلمة — البحث عن منتج\n/lowstock — مخزون منخفض\n/outstock — منتجات نافدة\n/setstock SKU كمية — تعديل المخزون\n/activity — آخر سجل تغييرات\n\nللمالك فقط:\n/stats — إحصائيات المتجر\n/profits — الأرباح\n/managers — المديرون\n/addadmin ID admin|staff — إضافة مدير\n/removeadmin ID — حذف مدير");
+    await sendWelcomePhoto(chatId);
+    await reply(chatId, "📋 أوامر RIVO BOT\n\n🔹 عام:\n/id — معرفة المعرفات\n/help — المساعدة\n\n🔷 للمديرين المعتمدين:\n/orders — آخر الطلبات (خاص)\n/neworders — الطلبات الجديدة (خاص)\n/pending — الطلبات المعلقة (خاص)\n/order رقم — تفاصيل طلب (خاص)\n/confirm رقم — تأكيد الدفع\n/cancel رقم — إلغاء طلب\n/ship رقم — تحديث الشحن\n/delivered رقم — تأكيد التسليم\n/products — المنتجات\n/product SKU — تفاصيل منتج\n/search كلمة — البحث عن منتج\n/lowstock — مخزون منخفض\n/outstock — منتجات نافدة\n/setstock SKU كمية — تعديل المخزون\n/activity — آخر سجل تغييرات (خاص)\n\n👑 للمالك فقط:\n/stats — إحصائيات المتجر (خاص)\n/profits — الأرباح (خاص)\n/managers — المديرون (خاص)\n/addadmin ID admin|staff — إضافة مدير\n/removeadmin ID — حذف مدير\n\n<developed by EL-sayed Hasan/>");
     return;
   }
 
