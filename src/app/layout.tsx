@@ -1,9 +1,10 @@
-import type { Metadata, Viewport } from "next";
+
+	mport type { Metadata, Viewport } from "next";
 import { Cairo, Space_Grotesk } from "next/font/google";
 import type { ReactNode } from "react";
 import { CartProvider } from "@/components/store/cart-context";
 import { ServiceWorker } from "@/components/ui/service-worker";
-import { MetaPixel } from "../components/MetaPixel";
+import { MetaPixel } from "@/components/MetaPixel";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_SLOGAN, SITE_URL } from "@/lib/site";
 import "./globals.css";
 
