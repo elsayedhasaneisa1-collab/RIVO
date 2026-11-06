@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, like, or, sql } from "drizzle-orm";
+import { desc, eq, inArray, like, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { auditLogs, orders, products, telegramManagers } from "@/db/schema";
 import { transitionOrder } from "@/lib/server/orders";
@@ -118,7 +118,6 @@ async function editMessage(
   });
   if (result && result.notModified) return;
   if (!result) {
-    // fallback: الرسالة الأصلية ممكن تكون صورة — نرسل جديدة
     await sendMessage(chatId, text, keyboard);
   }
 }
@@ -307,9 +306,8 @@ function isRateLimited(userId: string): boolean {
   return false;
 }
 
-/* ----------------------------- Action guards ----------------------------- */
+/* ----------------------------- Guards ----------------------------- */
 
-// يمنع تنفيذ الإجراءات لو الحالة الحالية غير مناسبة — يوفر round-trip على القاعدة
 const FORBIDDEN_STATUS: Record<string, string[]> = {
   confirm: ["paid", "sent_to_supplier", "shipping", "delivered", "cancelled"],
   cancel: ["delivered", "cancelled"],
@@ -318,7 +316,6 @@ const FORBIDDEN_STATUS: Record<string, string[]> = {
   delivered: ["pending", "payment_review", "cancelled", "delivered"],
 };
 
-// أوامر مسموح استخدامها في الجروبات فقط للقراءة
 const MUTATING_COMMANDS = new Set([
   "/confirm",
   "/cancel",
@@ -363,13 +360,11 @@ async function runCommand(message: TelegramMessage) {
     return;
   }
 
-  // أي محادثة غير خاصة لازم تكون الجروب المعتمد
   if (message.chat.type !== "private") {
     if (!groupId() || String(chatId) !== groupId()) {
       await reply(chatId, "⛔ هذا الجروب غير معتمد لبوت RIVO.");
       return;
     }
-    // في الجروب: نمنع أوامر تعديل البيانات
     if (MUTATING_COMMANDS.has(command)) {
       await reply(chatId, "🔒 أوامر تعديل الطلبات والمخزون متاحة فقط في المحادثة الخاصة مع البوت.");
       return;
@@ -554,7 +549,7 @@ async function runCommand(message: TelegramMessage) {
       await reply(chatId, "اكتب رقم الطلب بعد الأمر.");
       return;
     }
-    const actionKey = command.slice(1); // "confirm" | "cancel" | "ship" | "delivered"
+    const actionKey = command.slice(1);
     if (FORBIDDEN_STATUS[actionKey]?.includes(order.status)) {
       await reply(
         chatId,
@@ -737,7 +732,6 @@ async function handleCallbackQuery(cb: TelegramCallbackQuery) {
   const [type, action, ...rest] = cb.data.split(":");
   const reference = rest[0] ?? "";
 
-  // الإجراءات الحساسة للمالك فقط ولازم تكون في الخاص
   const ownerActions = new Set(["stats", "profits", "managers"]);
   if (ownerActions.has(type) && role !== "owner") {
     await answerCallback(cb.id, "⛔ للمالك فقط", true);
@@ -749,28 +743,25 @@ async function handleCallbackQuery(cb: TelegramCallbackQuery) {
   }
 
   try {
-    /* ---------------- menu ---------------- */
     if (type === "menu") {
       await answerCallback(cb.id);
       await editMessage(chatId, messageId, "اختر من القائمة:", mainMenu(role));
       return;
     }
 
-    /* ---------------- help ---------------- */
     if (type === "help") {
       await answerCallback(cb.id);
       await editMessage(chatId, messageId, buildHelp(role), backButton("menu"));
       return;
     }
 
-    /* ---------------- list:new / list:pending ---------------- */
     if (type === "list") {
       await answerCallback(cb.id);
-      const statuses = action === "new" ? ["pending" as const] : (["pending", "payment_review"] as const);
+      const statuses: string[] = action === "new" ? ["pending"] : ["pending", "payment_review"];
       const rows = await db
         .select({ reference: orders.reference, total: orders.total, status: orders.status })
         .from(orders)
-        .where(inArray(orders.status, statuses as unknown as string[]))
+        .where(inArray(orders.status, statuses))
         .orderBy(desc(orders.createdAt))
         .limit(10);
 
@@ -788,7 +779,6 @@ async function handleCallbackQuery(cb: TelegramCallbackQuery) {
       return;
     }
 
-    /* ---------------- view:REF ---------------- */
     if (type === "view") {
       const order = await findOrder(reference);
       if (!order) {
@@ -806,7 +796,6 @@ async function handleCallbackQuery(cb: TelegramCallbackQuery) {
       return;
     }
 
-    /* ---------------- act:<action>:REF ---------------- */
     if (type === "act") {
       const order = await findOrder(reference);
       if (!order) {
@@ -814,7 +803,6 @@ async function handleCallbackQuery(cb: TelegramCallbackQuery) {
         return;
       }
 
-      // إلغاء: خطوة تأكيد أولاً
       if (action === "cancel") {
         if (FORBIDDEN_STATUS.cancel.includes(order.status)) {
           await answerCallback(
@@ -893,7 +881,6 @@ async function handleCallbackQuery(cb: TelegramCallbackQuery) {
       return;
     }
 
-    /* ---------------- products:list / products:low ---------------- */
     if (type === "products") {
       await answerCallback(cb.id);
       const where =
@@ -916,7 +903,6 @@ async function handleCallbackQuery(cb: TelegramCallbackQuery) {
       return;
     }
 
-    /* ---------------- stats ---------------- */
     if (type === "stats") {
       await answerCallback(cb.id);
       const [row] = await db
@@ -935,7 +921,6 @@ async function handleCallbackQuery(cb: TelegramCallbackQuery) {
       return;
     }
 
-    /* ---------------- profits ---------------- */
     if (type === "profits") {
       await answerCallback(cb.id);
       const [row] = await db
@@ -953,7 +938,6 @@ async function handleCallbackQuery(cb: TelegramCallbackQuery) {
       return;
     }
 
-    /* ---------------- managers ---------------- */
     if (type === "managers") {
       await answerCallback(cb.id);
       const rows = await db
