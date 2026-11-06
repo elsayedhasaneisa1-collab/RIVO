@@ -1,5 +1,4 @@
-
-	mport type { Metadata, Viewport } from "next";
+import type { Metadata, Viewport } from "next";
 import { Cairo, Space_Grotesk } from "next/font/google";
 import type { ReactNode } from "react";
 import { CartProvider } from "@/components/store/cart-context";

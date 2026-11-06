@@ -9,7 +9,6 @@ function PixelTracker() {
   const searchParams = useSearchParams();
   const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID;
 
-  // تتبع تغيير الصفحات (يشتغل أول مرة ولما المستخدم يتنقل)
   useEffect(() => {
     if (typeof window !== "undefined" && (window as any).fbq && pixelId) {
       (window as any).fbq("track", "PageView");
