@@ -254,6 +254,11 @@ html[data-theme="light"] .skeleton {
   background: rgba(30,48,78,.08);
 }
 
+html[data-theme="light"] .site-footer {
+  background-color: #ffffff !important;
+  border-color: #dce3ef !important;
+}
+
 .logo-light {
   display: none;
 }
