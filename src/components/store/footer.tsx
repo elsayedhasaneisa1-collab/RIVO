@@ -29,11 +29,19 @@ function TikTokIcon() {
   );
 }
 
+function TelegramIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+      <path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z" />
+    </svg>
+  );
+}
+
 const socialClass =
-  "grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 transition-all duration-300 hover:-translate-y-1 hover:border-electric-500 hover:bg-electric-500 hover:text-white dark:border-white/10 dark:bg-white/5 dark:text-white/65 dark:hover:border-electric-500 dark:hover:bg-electric-500 dark:hover:text-white";
+  "grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-white/5 text-white/65 transition-all duration-300 hover:-translate-y-1 hover:border-electric-500 hover:bg-electric-500 hover:text-white";
 
 const linkClass =
-  "text-sm text-slate-600 transition-colors hover:text-electric-600 dark:text-white/60 dark:hover:text-electric-400";
+  "text-sm text-white/60 transition-colors hover:text-electric-400";
 
 export function Footer({
   settings,
@@ -49,22 +57,22 @@ export function Footer({
   )}`;
 
   return (
-    <footer className="relative mt-24 border-t border-slate-200 bg-white text-slate-900 transition-colors duration-300 dark:border-white/10 dark:bg-ink-900 dark:text-white">
+    <footer className="site-footer relative mt-24 border-t border-white/10 bg-ink-900 text-white transition-colors duration-300">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-electric-500/60 to-transparent" />
 
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-2 lg:grid-cols-4">
         <div className="space-y-4">
           <Logo />
 
-          <p className="font-display text-sm tracking-widest text-slate-500 dark:text-white/50" dir="ltr">
+          <p className="font-display text-sm tracking-widest text-white/50" dir="ltr">
             {settings.tagline || "Everything You Need."}
           </p>
 
-          <p className="text-sm leading-7 text-slate-600 dark:text-white/55">
+          <p className="text-sm leading-7 text-white/60">
             متجرك لكل ما تحتاجه، بتجربة تسوق سهلة وسريعة وتوصيل لجميع محافظات مصر.
           </p>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {settings.socialFacebook && (
               <a
                 href={settings.socialFacebook}
@@ -100,11 +108,21 @@ export function Footer({
                 <TikTokIcon />
               </a>
             )}
+
+            <a
+              href="https://t.me/RivoStoreChannel"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Telegram"
+              className={socialClass}
+            >
+              <TelegramIcon />
+            </a>
           </div>
         </div>
 
         <div>
-          <h3 className="mb-4 font-bold text-slate-900 dark:text-white">تسوق</h3>
+          <h3 className="mb-4 font-bold text-white">تسوق</h3>
 
           <ul className="space-y-3">
             <li><Link href="/products" className={linkClass}>كل المنتجات</Link></li>
@@ -115,11 +133,11 @@ export function Footer({
         </div>
 
         <div>
-          <h3 className="mb-4 font-bold text-slate-900 dark:text-white">التصنيفات</h3>
+          <h3 className="mb-4 font-bold text-white">التصنيفات</h3>
 
           <ul className="space-y-3">
             {categories.length === 0 && (
-              <li className="text-sm text-slate-400 dark:text-white/35">قريبًا</li>
+              <li className="text-sm text-white/40">قريبًا</li>
             )}
 
             {categories.slice(0, 6).map((category) => (
@@ -136,7 +154,7 @@ export function Footer({
         </div>
 
         <div>
-          <h3 className="mb-4 font-bold text-slate-900 dark:text-white">خدمة العملاء</h3>
+          <h3 className="mb-4 font-bold text-white">خدمة العملاء</h3>
 
           <ul className="space-y-3">
             <li><Link href="/track" className={linkClass}>تتبع طلبك</Link></li>
@@ -184,9 +202,9 @@ export function Footer({
         </div>
       </div>
 
-      <div className="border-t border-slate-200 dark:border-white/5">
+      <div className="border-t border-white/10">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-5 px-4 py-6 text-center sm:px-6 md:flex-row">
-          <p className="text-xs text-slate-500 dark:text-white/40">
+          <p className="text-xs text-white/50">
             © {year} {settings.storeName}. جميع الحقوق محفوظة.
           </p>
 
@@ -196,21 +214,21 @@ export function Footer({
             <Link href="/refund" className={linkClass}>الاستبدال والاسترجاع</Link>
           </div>
 
-          <p className="text-xs text-slate-500 dark:text-white/40">
+          <p className="text-xs text-white/50">
             تجربة تسوق أفضل مع RIVO
           </p>
         </div>
 
-        <div className="border-t border-slate-200 px-4 py-4 text-center dark:border-white/5">
+        <div className="border-t border-white/10 px-4 py-4 text-center">
           <a
             href={whatsappDevHref}
             target="_blank"
             rel="noopener noreferrer"
             title="تواصل مع المطور على واتساب"
-            className="font-mono text-xs tracking-wide text-slate-400 transition-colors hover:text-electric-500 dark:text-white/35 dark:hover:text-electric-400"
+            className="font-mono text-xs tracking-wide text-white/40 transition-colors hover:text-electric-400"
             dir="ltr"
           >
-            &lt;Developed by = "EL-sayed Hasan" and powered = true/&gt;
+            &lt; Developed by = "EL-sayed Hasan" and powered = true/&gt;
           </a>
         </div>
       </div>
