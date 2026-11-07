@@ -254,11 +254,6 @@ html[data-theme="light"] .skeleton {
   background: rgba(30,48,78,.08);
 }
 
-html[data-theme="light"] .site-footer {
-  background-color: #ffffff !important;
-  border-color: #dce3ef !important;
-}
-
 .logo-light {
   display: none;
 }
@@ -304,5 +299,35 @@ html[data-theme="light"] .logo-light {
   .print-invoice table th,
   .print-invoice table td {
     border: 1px solid #bbb !important;
+  }
+}
+
+html.theme-transitioning::view-transition-old(root),
+html.theme-transitioning::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+html.theme-transitioning::view-transition-old(root) {
+  z-index: 1;
+}
+
+html.theme-transitioning::view-transition-new(root) {
+  z-index: 2;
+  animation: theme-reveal 0.65s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes theme-reveal {
+  from {
+    clip-path: circle(0 at var(--theme-x, 50%) var(--theme-y, 50%));
+  }
+  to {
+    clip-path: circle(var(--theme-r, 150vmax) at var(--theme-x, 50%) var(--theme-y, 50%));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.theme-transitioning::view-transition-new(root) {
+    animation: none;
   }
 }
