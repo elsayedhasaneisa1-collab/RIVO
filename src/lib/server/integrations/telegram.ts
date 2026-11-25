@@ -257,7 +257,7 @@ function buildProductCaption(product: TelegramProduct): string {
     `━━━━━━━━━━━━━━━━━━\n` +
     `💬 <b>الدعم الفني RIVO</b>\n` +
     `للاستفسارات والمساعدة:\n` +
-    `👉 <a href="https://t.me/OfficialRevoSuppor">@OfficialRevoSuppor</a>`
+    `👉 <a href="https://t.me/OfficialRevoSuppor">@Rivo_Support</a>`
   );
 }
 
